@@ -1,0 +1,2624 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PPT 数字人脚本增强工具 · LiveTalking</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #f8f9ff 0%, #eef2ff 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #1f2937;
+        }
+        .page-wrapper {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 40px 20px 80px;
+        }
+        .hero-card {
+            background: rgba(255, 255, 255, 0.85);
+            border: none;
+            border-radius: 20px;
+            box-shadow: 0 25px 50px -12px rgba(59, 130, 246, 0.25);
+            overflow: hidden;
+        }
+        .hero-card .card-body {
+            padding: 40px;
+        }
+        .hero-title {
+            font-weight: 700;
+            font-size: 2.2rem;
+            color: #1d4ed8;
+        }
+        .hero-subtitle {
+            font-size: 1.15rem;
+            color: #4b5563;
+        }
+        .badge-step {
+            background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%);
+            border-radius: 999px;
+            padding: 8px 18px;
+            color: white;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        .upload-card {
+            background: white;
+            border-radius: 18px;
+            border: 1px solid rgba(59, 130, 246, 0.1);
+            box-shadow: 0 18px 35px -18px rgba(37, 99, 235, 0.4);
+        }
+        .upload-card .card-body {
+            padding: 32px;
+        }
+        .file-dropzone {
+            border: 2px dashed rgba(37, 99, 235, 0.25);
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+            transition: all 0.25s ease;
+        }
+        .file-dropzone:hover {
+            border-color: rgba(37, 99, 235, 0.6);
+            background-color: rgba(37, 99, 235, 0.05);
+        }
+        .file-dropzone input[type="file"] {
+            display: none;
+        }
+        .file-dropzone label {
+            cursor: pointer;
+            font-weight: 600;
+            color: #2563eb;
+        }
+        .step-card {
+            background: white;
+            border: none;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px -24px rgba(99, 102, 241, 0.55);
+        }
+        .status-badge {
+            font-size: 0.85rem;
+            border-radius: 999px;
+            padding: 6px 14px;
+        }
+        .result-card {
+            border-radius: 16px;
+            border: 1px solid rgba(59, 130, 246, 0.15);
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 18px 38px -26px rgba(37, 99, 235, 0.5);
+        }
+        .progress {
+            height: 10px;
+        }
+        .preview-card {
+            background: white;
+            border-radius: 18px;
+            border: 1px solid rgba(37, 99, 235, 0.12);
+            box-shadow: 0 18px 35px -20px rgba(37, 99, 235, 0.35);
+        }
+        .preview-card .card-body {
+            padding: 28px 32px;
+        }
+        .slide-preview.card {
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 38px -30px rgba(15, 23, 42, 0.35);
+        }
+        .slide-preview .card-header {
+            background: linear-gradient(120deg, rgba(59,130,246,0.12), rgba(79,70,229,0.08));
+            border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+        }
+        .slide-canvas {
+            position: relative;
+            background: #f8fafc;
+            aspect-ratio: 4 / 3;
+            border-radius: 0 0 16px 16px;
+            overflow: hidden;
+        }
+        .slide-canvas img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+            user-select: none;
+            pointer-events: none;
+        }
+        .selection-box {
+            position: absolute;
+            border: 3px dashed rgba(37, 99, 235, 0.85);
+            background: rgba(59, 130, 246, 0.04);
+            border-radius: 12px;
+            cursor: move;
+            transition: box-shadow 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .selection-box:active {
+            box-shadow: 0 12px 25px -15px rgba(37,99,235,0.45);
+        }
+        .selection-box .selection-preview {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            pointer-events: none;
+            user-select: none;
+            mix-blend-mode: normal;
+        }
+        .selection-box .resize-handle {
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #1d4ed8;
+            border: 3px solid white;
+            bottom: -11px;
+            right: -11px;
+            cursor: nwse-resize;
+            box-shadow: 0 6px 14px -6px rgba(37,99,235,0.6);
+        }
+        .slide-hidden {
+            display: none !important;
+        }
+        .preview-empty {
+            text-align: center;
+            color: #6b7280;
+            padding: 30px 0 10px;
+        }
+        .avatar-option {
+            border: 2px solid rgba(37, 99, 235, 0.15);
+            border-radius: 16px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: white;
+            box-shadow: 0 12px 28px -20px rgba(37, 99, 235, 0.4);
+        }
+        .avatar-option:hover {
+            border-color: rgba(37, 99, 235, 0.45);
+            transform: translateY(-2px);
+        }
+        .avatar-option.selected {
+            border-color: #2563eb;
+            box-shadow: 0 18px 36px -18px rgba(37, 99, 235, 0.55);
+        }
+        .avatar-option img {
+            width: 100%;
+            height: 160px;
+            object-fit: cover;
+            object-position: center 25%;
+            display: block;
+        }
+        .avatar-option .avatar-name {
+            padding: 12px 16px;
+            font-weight: 600;
+            color: #1f2937;
+            text-align: center;
+        }
+        .voice-selector-control {
+            position: relative;
+            width: 100%;
+        }
+        .voice-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0;
+            right: 0;
+            z-index: 30;
+            background: #ffffff;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            border-radius: 12px;
+            padding: 6px;
+            box-shadow: 0 18px 36px -20px rgba(15, 23, 42, 0.45);
+            max-height: 260px;
+            overflow-y: auto;
+            display: none;
+        }
+        .voice-menu.show {
+            display: block;
+        }
+        .voice-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px;
+            border-radius: 10px;
+        }
+        .voice-menu-item:hover {
+            background: rgba(37, 99, 235, 0.05);
+        }
+        .voice-option {
+            flex: 1;
+            border: 0;
+            background: transparent;
+            text-align: left;
+            padding: 10px 12px;
+            border-radius: 10px;
+            color: #1f2937;
+            font-weight: 500;
+        }
+        .voice-option small {
+            display: block;
+            color: #6b7280;
+            font-weight: 400;
+            margin-top: 2px;
+        }
+        .voice-option:hover,
+        .voice-option.active {
+            background: rgba(37, 99, 235, 0.1);
+            color: #1d4ed8;
+        }
+        .voice-preview-btn {
+            border: 0;
+            background: rgba(37, 99, 235, 0.12);
+            color: #1d4ed8;
+            font-weight: 600;
+            padding: 8px 12px;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease-in-out;
+        }
+        .voice-preview-btn:hover {
+            background: rgba(37, 99, 235, 0.22);
+        }
+        .voice-preview-btn.previewing {
+            background: rgba(220, 38, 38, 0.18);
+            color: #b91c1c;
+        }
+        .avatar-gallery-empty {
+            padding: 20px;
+            border: 1px dashed rgba(148, 163, 184, 0.5);
+            border-radius: 14px;
+            color: #6b7280;
+            text-align: center;
+        }
+        footer {
+            margin-top: 60px;
+            text-align: center;
+            color: #6b7280;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <div class="card hero-card mb-4">
+            <div class="card-body d-flex flex-column flex-lg-row align-items-start align-items-lg-center gap-4">
+                <div class="flex-grow-1">
+                    <div class="badge-step mb-3">LiveTalking | PPT 数字人自动讲解</div>
+                    <h1 class="hero-title mb-3">上传 PPT 与脚本，自动生成数字人讲解视频</h1>
+                    <p class="hero-subtitle mb-0">Word 文档使用 <strong>p1、p2、p3...</strong> 对应各页幻灯片脚本，系统会为每一页自动合成数字人朗读视频并嵌入 PPT。</p>
+                </div>
+                <div>
+                    <a href="dashboard.html" class="btn btn-outline-primary btn-lg">
+                        <i class="bi bi-speedometer2 me-2"></i>返回控制面板
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="card upload-card mb-4" id="avatar-card">
+            <div class="card-body">
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
+                    <div>
+                        <h4 class="fw-semibold mb-1">选择数字人</h4>
+                        <p class="text-secondary mb-0">从已有数字人中选择立即应用，或上传视频生成全新的数字人。</p>
+                    </div>
+                    <button type="button" class="btn btn-outline-primary" id="avatar-custom-toggle-btn">
+                        <i class="bi bi-magic me-2"></i>自定义数字人
+                    </button>
+                </div>
+                <div class="avatar-gallery-empty mb-3" id="avatar-gallery-placeholder" style="display: none;">
+                    暂无可用数字人，请先生成自定义数字人。
+                </div>
+                <div class="row g-3" id="avatar-gallery"></div>
+                <div class="d-flex flex-column flex-md-row align-items-md-center gap-3 mt-3">
+                    <button type="button" class="btn btn-primary" id="avatar-select-btn" disabled>确认选择并重启</button>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-secondary" id="avatar-status-badge">待选择</span>
+                        <span class="text-muted" id="avatar-status-text">选择一个数字人或创建自定义。</span>
+                    </div>
+                </div>
+                <div id="avatar-custom-section" class="mt-4" style="display: none;">
+                    <h5 class="fw-semibold mb-3">生成自定义数字人</h5>
+                    <p class="text-secondary">上传驱动视频与静态展示视频，系统会自动生成新的数字人并重启加载。</p>
+                    <form id="avatar-form" class="row g-3">
+                        <div class="col-lg-4">
+                            <label for="avatar-name" class="form-label">数字人标识</label>
+                            <input type="text" class="form-control" id="avatar-name" placeholder="如：custom_host" maxlength="32">
+                            <div class="form-text">仅支持字母、数字、下划线、短横线，1-32 个字符。</div>
+                        </div>
+                        <div class="col-lg-4">
+                            <label for="avatar-video" class="form-label">驱动视频</label>
+                            <input type="file" class="form-control" id="avatar-video" accept="video/mp4,video/*">
+                            <div class="form-text">用于数字人说话状态，无需口型，建议有自然的手部动作。</div>
+                        </div>
+                        <div class="col-lg-4">
+                            <label for="avatar-video-static" class="form-label">静态展示视频</label>
+                            <input type="file" class="form-control" id="avatar-video-static" accept="video/mp4,video/*">
+                            <div class="form-text">用于数字人呼吸状态，无需口型，无需手部动作。</div>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary" id="avatar-submit-btn">生成自定义数字人</button>
+                        </div>
+                        <div class="col-12">
+                            <div class="progress" id="avatar-progress" style="display: none; height: 12px;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" id="avatar-progress-bar" style="width: 0%;"></div>
+                            </div>
+                            <div class="small text-muted mt-2" id="avatar-progress-text" style="display: none;"></div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="card upload-card mb-4">
+            <div class="card-body">
+                <form id="augment-form">
+                    <input type="hidden" id="positions-input" name="positions">
+                    <div class="row g-4">
+                        <div class="col-lg-6">
+                            <div class="file-dropzone h-100 d-flex flex-column justify-content-center" id="ppt-dropzone">
+                                <i class="bi bi-file-earmark-slides fs-1 text-primary mb-3"></i>
+                                <h5 class="mb-2">上传 PPT 文件</h5>
+                                <p class="text-muted mb-3">支持 .pptx / .ppt，建议使用 .pptx</p>
+                                <label class="btn btn-primary">
+                                    选择 PPT
+                                    <input type="file" id="ppt-input" accept=".pptx,.ppt">
+                                </label>
+                                <div class="mt-2 small text-secondary" id="ppt-filename">尚未选择文件</div>
+                            </div>
+                        </div>
+                        <div class="col-lg-6">
+                            <div class="file-dropzone h-100 d-flex flex-column justify-content-center" id="doc-dropzone">
+                                <i class="bi bi-file-earmark-text fs-1 text-primary mb-3"></i>
+                                <h5 class="mb-2">上传脚本 Word</h5>
+                                <p class="text-muted mb-3">脚本中使用 p1/p2/p3 开头标记对应页</p>
+                                <label class="btn btn-primary">
+                                    选择 Word
+                                    <input type="file" id="doc-input" accept=".docx">
+                                </label>
+                                <div class="mt-2 small text-secondary" id="doc-filename">尚未选择文件</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <div class="alert alert-light border rounded-3">
+                            <div class="d-flex align-items-start gap-3">
+                                <i class="bi bi-info-circle text-primary fs-3"></i>
+                                <div>
+                                    <h6 class="fw-semibold">脚本编写示例</h6>
+                                    <p class="mb-1">脚本以 "p页码" 开头，后接要朗读的内容，可换行补充细节：</p>
+                                    <pre class="bg-light p-3 rounded-3 mb-0 small text-secondary">p1 大家好，欢迎来到本次分享。
+p2 本页介绍产品核心优势，一共有三点...
+p3 ...</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row align-items-end mt-4">
+                        <div class="col-lg-6">
+                            <label class="form-label fw-semibold mb-2" for="voice-btn">数字人语音</label>
+                            <div class="voice-selector-control">
+                                <button type="button" class="btn btn-outline-primary w-100 d-flex align-items-center justify-content-between" id="voice-btn">
+                                    <span class="d-flex align-items-center flex-grow-1" id="voice-btn-label"></span>
+                                    <i class="bi bi-chevron-down ms-2"></i>
+                                </button>
+                                <div class="voice-menu" id="voice-menu"></div>
+                            </div>
+                            <div class="form-text text-secondary mt-2">切换 Microsoft Edge TTS 中文语音，影响数字人配音效果。</div>
+                        </div>
+                    </div>
+
+                    <div class="text-center mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg px-5" id="submit-btn">
+                            <i class="bi bi-magic me-2"></i>开始生成数字人讲解 PPT
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card preview-card mb-4" id="preview-card">
+            <div class="card-body">
+                <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+                    <div>
+                        <h5 class="fw-semibold mb-1">幻灯片预览与视频位置</h5>
+                        <p class="text-secondary mb-0">拖动蓝色区域即可调整数字人视频在每页的摆放位置与大小（相对于幻灯片尺寸）。</p>
+                    </div>
+                    <div class="d-flex flex-column flex-md-row align-items-md-center gap-2 justify-content-md-end">
+                        <span class="text-secondary small text-md-end" id="preview-meta"></span>
+                        <div class="btn-group" role="group" aria-label="preview actions">
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="preview-expand-btn">展开</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="preview-apply-all-btn">应用到全部</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="preview-placeholder" class="preview-empty">
+                    <i class="bi bi-images fs-2 text-primary"></i>
+                    <div class="mt-2">上传 PPT 后将在这里显示每一页的预览图，供你拖动蓝色区域调整数字人视频位置。</div>
+                </div>
+                <div id="preview-loader" class="preview-empty" style="display: none;">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <div class="mt-2">正在生成幻灯片预览…</div>
+                </div>
+                <div class="row g-4 mt-3" id="preview-slides"></div>
+            </div>
+        </div>
+
+        <div class="card step-card mb-4">
+            <div class="card-body">
+                <h5 class="mb-3 fw-semibold">处理进度</h5>
+                <div class="d-flex flex-column gap-2" id="status-log">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-secondary status-badge" id="status-badge">等待上传</span>
+                        <span id="status-text" class="text-muted">请上传 PPT 与 Word 脚本开始</span>
+                    </div>
+                    <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" id="status-progress" style="width: 0%;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card result-card" id="result-card" style="display: none;">
+            <div class="card-body d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
+                <div>
+                    <h5 class="fw-semibold text-success mb-1"><i class="bi bi-check-circle me-2"></i>生成成功</h5>
+                    <p class="mb-0 text-secondary">已为每一页 PPT 自动嵌入数字人朗读视频，点击下方按钮下载增强版 PPT。</p>
+                </div>
+                <div class="d-flex flex-column flex-sm-row gap-3">
+                    <a id="download-link" class="btn btn-success btn-lg" download>
+                        <i class="bi bi-download me-2"></i>下载增强 PPT
+                    </a>
+                    <button class="btn btn-outline-primary btn-lg" id="course-btn" style="display: none;">
+                        <i class="bi bi-film me-2"></i>生成视频课
+                    </button>
+                    <button class="btn btn-outline-secondary btn-lg" id="reset-btn">
+                        <i class="bi bi-arrow-counterclockwise me-2"></i>重新生成
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <footer class="mt-5">
+            <p class="mb-1">© <span id="year"></span> LiveTalking · 让内容自动开口说话</p>
+            <small>如需自定义声音或数字人风格，请联系管理员。</small>
+        </footer>
+    </div>
+
+    <script>
+        const pptInput = document.getElementById('ppt-input');
+        const docInput = document.getElementById('doc-input');
+        const pptFilename = document.getElementById('ppt-filename');
+        const docFilename = document.getElementById('doc-filename');
+        const statusBadge = document.getElementById('status-badge');
+        const statusText = document.getElementById('status-text');
+        const progressBar = document.getElementById('status-progress');
+        const resultCard = document.getElementById('result-card');
+    const downloadLink = document.getElementById('download-link');
+    const courseBtn = document.getElementById('course-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const submitBtn = document.getElementById('submit-btn');
+        const yearSpan = document.getElementById('year');
+        const previewSlides = document.getElementById('preview-slides');
+        const previewLoader = document.getElementById('preview-loader');
+        const previewMeta = document.getElementById('preview-meta');
+        const positionsInput = document.getElementById('positions-input');
+        const previewPlaceholder = document.getElementById('preview-placeholder');
+        const previewLoaderDefault = previewLoader.innerHTML;
+        const previewPlaceholderDefault = previewPlaceholder.innerHTML;
+        const expandBtn = document.getElementById('preview-expand-btn');
+        const applyAllBtn = document.getElementById('preview-apply-all-btn');
+    const avatarForm = document.getElementById('avatar-form');
+    const avatarNameInput = document.getElementById('avatar-name');
+    const avatarVideoInput = document.getElementById('avatar-video');
+    const avatarVideoStaticInput = document.getElementById('avatar-video-static');
+    const avatarSubmitBtn = document.getElementById('avatar-submit-btn');
+    const avatarStatusBadge = document.getElementById('avatar-status-badge');
+    const avatarStatusText = document.getElementById('avatar-status-text');
+    const avatarGallery = document.getElementById('avatar-gallery');
+    const avatarGalleryPlaceholder = document.getElementById('avatar-gallery-placeholder');
+    const avatarSelectBtn = document.getElementById('avatar-select-btn');
+    const avatarCustomToggleBtn = document.getElementById('avatar-custom-toggle-btn');
+    const avatarCustomSection = document.getElementById('avatar-custom-section');
+    const avatarSelectDefault = avatarSelectBtn.innerHTML;
+    const avatarCustomToggleDefault = avatarCustomToggleBtn.innerHTML;
+    const avatarSubmitDefault = avatarSubmitBtn.innerHTML;
+    const avatarProgress = document.getElementById('avatar-progress');
+    const avatarProgressBar = document.getElementById('avatar-progress-bar');
+    const avatarProgressText = document.getElementById('avatar-progress-text');
+    const voiceBtn = document.getElementById('voice-btn');
+    const voiceMenu = document.getElementById('voice-menu');
+    const voiceBtnLabel = document.getElementById('voice-btn-label');
+    const DEFAULT_AVATAR_REFERENCE_NAME = 'shuziren_test2';
+    const DEFAULT_AVATAR_REFERENCE_FALLBACK = `/data/avatars/${DEFAULT_AVATAR_REFERENCE_NAME}/full_imgs/00000000.png`;
+
+    const EDGE_TTS_VOICES = [
+        { id: 'zh-CN-YunxiaNeural', label: '云夏 · 女声', description: '温柔亲切，适合日常讲解' },
+        { id: 'zh-CN-YunxiNeural', label: '云曦 · 男声', description: '沉稳清晰，青年讲解音色' },
+        { id: 'zh-CN-YunyangNeural', label: '云扬 · 男声', description: '成熟稳重，适合正式场景' },
+        { id: 'zh-CN-YunjianNeural', label: '云剑 · 男声', description: '明亮自信，擅长宣讲' },
+        { id: 'zh-CN-YunhaoNeural', label: '云浩 · 男声', description: '温暖柔和，轻松愉悦' },
+        { id: 'zh-CN-YunfengNeural', label: '云峰 · 男声', description: '自信富有表现力，情绪充沛' },
+        { id: 'zh-CN-YunjieNeural', label: '云杰 · 男声', description: '亲切稳重，易于倾听' },
+        { id: 'zh-CN-YunxiaoMultilingualNeural', label: '云霄 · 男声（多语）', description: '温和随和，多语言支持' },
+        { id: 'zh-CN-Yunfan:DragonHDLatestNeural', label: '云帆 · 男声（Dragon HD）', description: 'Dragon HD 高清音色，沉稳大气' },
+        { id: 'zh-CN-YunfanMultilingualNeural', label: '云帆 · 男声（多语）', description: '自然流畅，覆盖多语种场景' },
+        { id: 'zh-CN-YunyeNeural', label: '云烨 · 男声', description: '随性沉稳，适合轻松表达' },
+        { id: 'zh-CN-YunyiMultilingualNeural', label: '云逸 · 男声（多语）', description: '柔和友好，多场景适配' },
+        { id: 'zh-CN-YunzeNeural', label: '云泽 · 男声', description: '沉着自信，适合正式解说' },
+        { id: 'zh-CN-henan-YundengNeural', label: '云登 · 男声（河南）', description: '河南口音，亲切朴实' },
+        { id: 'zh-CN-shandong-YunxiangNeural', label: '云翔 · 男声（山东）', description: '充满活力，富有地域特色' },
+        { id: 'zh-CN-sichuan-YunxiNeural', label: '云曦 · 男声（四川）', description: '四川口音，轻松自然' },
+        { id: 'wuu-CN-YunzheNeural', label: '云哲 · 男声（吴语）', description: '沉稳内敛，吴语表达' },
+        { id: 'yue-CN-YunSongNeural', label: '云嵩 · 男声（粤语）', description: '沉稳正式，粤语播报' },
+        { id: 'zh-HK-WanLungNeural', label: '云龙 · 男声（香港）', description: '稳重大气，粤语解说' },
+        { id: 'zh-TW-YunJheNeural', label: '云哲 · 男声（台湾）', description: '温和亲切，台湾腔调' },
+        { id: 'zu-ZA-ThembaNeural', label: 'Themba · 男声（祖鲁语）', description: '低沉稳重，跨文化演示' },
+        { id: 'zh-CN-XiaoxiaoNeural', label: '晓晓 · 女声', description: '微软经典女声，语气自然' },
+        { id: 'zh-CN-XiaoxiaoDialectsNeural', label: '晓晓 · 女声（方言）', description: '支持多种方言，灵活生动' },
+        { id: 'zh-CN-XiaoxiaoMultilingualNeural', label: '晓晓 · 女声（多语）', description: '多语支持，语气活泼' },
+        { id: 'zh-CN-Xiaochen:DragonHDLatestNeural', label: '晓宸 · 女声（Dragon HD）', description: 'Dragon HD 高清品质，亲切有活力' },
+        { id: 'zh-CN-XiaochenMultilingualNeural', label: '晓宸 · 女声（多语）', description: '友好轻快，多语言覆盖' },
+        { id: 'zh-CN-XiaochenNeural', label: '晓宸 · 女声', description: '友好自然，节奏明快' },
+        { id: 'zh-CN-XiaohanNeural', label: '晓涵 · 女声', description: '温柔细腻，情感充沛' },
+        { id: 'zh-CN-XiaomengNeural', label: '晓萌 · 女声', description: '活泼开朗，亲和力强' },
+        { id: 'zh-CN-XiaomoNeural', label: '晓墨 · 女声', description: '低沉冷静，富有质感' },
+        { id: 'zh-CN-XiaoqiuNeural', label: '晓秋 · 女声', description: '沉静温柔，舒缓柔和' },
+        { id: 'zh-CN-XiaorouNeural', label: '晓柔 · 女声', description: '明快愉悦，听感舒适' },
+        { id: 'zh-CN-XiaoruiNeural', label: '晓蕊 · 女声', description: '自信带沙哑，情感鲜明' },
+        { id: 'zh-CN-XiaoshuangNeural', label: '晓霜 · 女声', description: '清新明快，元气满满' },
+        { id: 'zh-CN-XiaoyanNeural', label: '晓妍 · 女声', description: '温柔共情，贴心陪伴' },
+        { id: 'zh-CN-XiaoyiNeural', label: '晓依 · 女声', description: '明亮动感，富有情绪' },
+        { id: 'zh-CN-XiaoyouNeural', label: '晓悠 · 女声', description: '清脆活泼，青春感十足' },
+        { id: 'zh-CN-XiaoyuMultilingualNeural', label: '晓语 · 女声（多语）', description: '沉稳自信，多语言胜任' },
+        { id: 'zh-CN-XiaozhenNeural', label: '晓珍 · 女声', description: '冷静笃定，适合严肃说明' },
+        { id: 'zh-CN-liaoning-XiaobeiNeural', label: '晓北 · 女声（辽宁）', description: '东北口音，亲切生活化' },
+        { id: 'zh-CN-shaanxi-XiaoniNeural', label: '晓妮 · 女声（陕西）', description: '自信热情，关中风味' },
+        { id: 'wuu-CN-XiaotongNeural', label: '晓彤 · 女声（吴语）', description: '温暖友好，江浙方言表达' },
+        { id: 'yue-CN-XiaoMinNeural', label: '晓敏 · 女声（粤语）', description: '清亮利落，粤语授课' },
+        { id: 'zh-HK-HiuGaaiNeural', label: '晓佳 · 女声（香港）', description: '清亮透彻，粤语与普通话' },
+        { id: 'zh-HK-HiuMaanNeural', label: '晓曼 · 女声（香港）', description: '轻快活泼，粤语普通话双语' },
+        { id: 'zh-TW-HsiaoChenNeural', label: '晓臻 · 女声（台湾）', description: '台湾腔调，温润清晰' },
+        { id: 'zh-TW-HsiaoYuNeural', label: '晓渝 · 女声（台湾）', description: '清亮明快，台湾特色' },
+        { id: 'zu-ZA-ThandoNeural', label: 'Thando · 女声（祖鲁语）', description: '亲切明亮，国际合作场景' }
+    ];
+    const DEFAULT_EDGE_VOICE = EDGE_TTS_VOICES[0]?.id || 'zh-CN-YunxiaNeural';
+    let selectedVoiceId = DEFAULT_EDGE_VOICE;
+    let voicePreviewAudio = null;
+    let voicePreviewObjectUrl = null;
+    let voicePreviewAbortController = null;
+    let voicePreviewActiveButton = null;
+
+    const updateVoiceButton = () => {
+        if (!EDGE_TTS_VOICES.length) {
+            return;
+        }
+        const current = EDGE_TTS_VOICES.find((voice) => voice.id === selectedVoiceId) || EDGE_TTS_VOICES[0];
+        if (voiceBtnLabel) {
+            voiceBtnLabel.innerHTML = `<i class="bi bi-volume-up-fill me-2"></i>${current.label}`;
+        }
+        if (voiceMenu) {
+            voiceMenu.querySelectorAll('.voice-option').forEach((button) => {
+                button.classList.toggle('active', button.dataset.voiceId === current.id);
+            });
+        }
+    };
+
+    const resetVoicePreviewButton = (button) => {
+        if (!button) {
+            return;
+        }
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-play-circle me-1"></i>试听';
+        button.classList.remove('previewing');
+    };
+
+    const stopVoicePreview = () => {
+        if (voicePreviewAbortController) {
+            voicePreviewAbortController.abort();
+            voicePreviewAbortController = null;
+        }
+        if (voicePreviewAudio) {
+            try {
+                voicePreviewAudio.pause();
+            } catch (err) {
+                console.warn('stop preview pause failed', err);
+            }
+            voicePreviewAudio = null;
+        }
+        if (voicePreviewObjectUrl) {
+            URL.revokeObjectURL(voicePreviewObjectUrl);
+            voicePreviewObjectUrl = null;
+        }
+        if (voicePreviewActiveButton) {
+            resetVoicePreviewButton(voicePreviewActiveButton);
+            voicePreviewActiveButton = null;
+        }
+    };
+
+    const playVoicePreview = async (voiceId, button) => {
+        if (!voiceId || !button) {
+            return;
+        }
+        if (voicePreviewActiveButton === button) {
+            stopVoicePreview();
+            return;
+        }
+
+        stopVoicePreview();
+        voicePreviewActiveButton = button;
+        button.disabled = true;
+        button.classList.add('previewing');
+        button.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>加载中...';
+
+        const controller = new AbortController();
+        voicePreviewAbortController = controller;
+        try {
+            const response = await fetch(`/tts/preview?voice=${encodeURIComponent(voiceId)}`, {
+                signal: controller.signal,
+            });
+            if (!response.ok) {
+                const text = await response.text().catch(() => '');
+                throw new Error(text || '语音预览失败');
+            }
+            const blob = await response.blob();
+            voicePreviewAbortController = null;
+            voicePreviewObjectUrl = URL.createObjectURL(blob);
+            voicePreviewAudio = new Audio(voicePreviewObjectUrl);
+            voicePreviewAudio.addEventListener('ended', () => stopVoicePreview());
+            voicePreviewAudio.addEventListener('pause', () => {
+                if (!voicePreviewAudio || voicePreviewAudio.currentTime >= voicePreviewAudio.duration) {
+                    stopVoicePreview();
+                }
+            });
+            await voicePreviewAudio.play();
+            button.disabled = false;
+            button.innerHTML = '<i class="bi bi-stop-circle me-1"></i>停止';
+        } catch (error) {
+            if (!(controller.signal.aborted)) {
+                console.error('voice preview failed', error);
+                alert(`语音预览失败：${error.message || error}`);
+            }
+            stopVoicePreview();
+        }
+    };
+
+    const buildVoiceMenu = () => {
+        if (!voiceMenu) {
+            updateVoiceButton();
+            return;
+        }
+        voiceMenu.innerHTML = '';
+        EDGE_TTS_VOICES.forEach((voice) => {
+            const item = document.createElement('div');
+            item.className = 'voice-menu-item';
+
+            const optionBtn = document.createElement('button');
+            optionBtn.type = 'button';
+            optionBtn.className = 'voice-option';
+            optionBtn.dataset.voiceId = voice.id;
+            optionBtn.innerHTML = `<span class="fw-semibold">${voice.label}</span><small>${voice.description}</small>`;
+            optionBtn.addEventListener('click', () => {
+                selectedVoiceId = voice.id;
+                updateVoiceButton();
+                stopVoicePreview();
+                voiceMenu.classList.remove('show');
+            });
+
+            const previewBtn = document.createElement('button');
+            previewBtn.type = 'button';
+            previewBtn.className = 'voice-preview-btn';
+            previewBtn.innerHTML = '<i class="bi bi-play-circle me-1"></i>试听';
+            previewBtn.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                playVoicePreview(voice.id, previewBtn);
+            });
+
+            item.appendChild(optionBtn);
+            item.appendChild(previewBtn);
+            voiceMenu.appendChild(item);
+        });
+        updateVoiceButton();
+    };
+
+    const closeVoiceMenu = () => {
+        stopVoicePreview();
+        if (voiceMenu) {
+            voiceMenu.classList.remove('show');
+        }
+    };
+
+    if (voiceBtn) {
+        voiceBtn.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (!voiceMenu) {
+                return;
+            }
+            if (voiceMenu.classList.contains('show')) {
+                closeVoiceMenu();
+            } else {
+                voiceMenu.classList.add('show');
+            }
+        });
+    }
+
+    document.addEventListener('click', (event) => {
+        if (!voiceMenu || !voiceMenu.classList.contains('show')) {
+            return;
+        }
+        if (voiceBtn && (voiceBtn === event.target || voiceBtn.contains(event.target))) {
+            return;
+        }
+        if (voiceMenu.contains(event.target)) {
+            return;
+        }
+        closeVoiceMenu();
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            closeVoiceMenu();
+        }
+    });
+
+    window.addEventListener('beforeunload', () => {
+        stopVoicePreview();
+    });
+
+    buildVoiceMenu();
+
+    yearSpan.textContent = new Date().getFullYear();
+
+    const FILE_LIMIT_MB = 300;
+    const DEFAULT_POSITION_INCH = { left: 5.0, top: 1.0, width: 4.5, height: 3.2 };
+    const MIN_BOX_RATIO = 0.08;
+    const MIN_BOX_PX = 40;
+    const DEFAULT_OVERLAY_SCALE = 0.67;
+    const AVATAR_NAME_PATTERN = /^[A-Za-z0-9_-]{1,32}$/;
+
+    const extractFilename = (disposition, fallback) => {
+        if (!disposition || typeof disposition !== 'string') {
+            return fallback;
+        }
+        const match = disposition.match(/filename\*?=([^;]+)/i);
+        if (!match) {
+            return fallback;
+        }
+        const raw = match[1].replace(/"/g, '').replace("UTF-8''", '');
+        try {
+            return decodeURIComponent(raw);
+        } catch (error) {
+            return raw;
+        }
+    };
+
+    let slideMeta = null;
+    let slidePositions = {};
+    let interactionState = null;
+    let slideElements = new Map();
+    let slidesExpanded = false;
+    let availableAvatars = [];
+    let activeAvatarName = null;
+    let selectedAvatarName = null;
+    let selectedAvatarCard = null;
+    let customSectionVisible = false;
+    let avatarProgressTimer = null;
+    let avatarProgressValue = 0;
+    let avatarProgressHideTimer = null;
+    let defaultAvatarSize = null;
+    let defaultAvatarRatio = null;
+    const avatarThumbnailMap = new Map();
+    const avatarDimensionCache = new Map();
+    const avatarDimensionLoaders = new Map();
+    const registerAvatarDimensions = (avatarName, width, height) => {
+        const w = Number(width);
+        const h = Number(height);
+        if (!avatarName || !Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) {
+            return null;
+        }
+        const entry = { width: w, height: h, ratio: w / h };
+        avatarDimensionCache.set(avatarName, entry);
+        return entry;
+    };
+
+    const syncActiveAvatarAspectFromPreview = (previewEl) => {
+        if (!previewEl || !defaultAvatarReferenceName) {
+            return;
+        }
+
+        const commitDimensions = () => {
+            const width = Number(previewEl.naturalWidth || previewEl.width || previewEl.clientWidth);
+            const height = Number(previewEl.naturalHeight || previewEl.height || previewEl.clientHeight);
+            if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+                return;
+            }
+            const nextEntry = registerAvatarDimensions(defaultAvatarReferenceName, width, height);
+            if (!nextEntry) {
+                return;
+            }
+            const ratioDelta = !Number.isFinite(defaultAvatarRatio)
+                ? Number.POSITIVE_INFINITY
+                : Math.abs(defaultAvatarRatio - nextEntry.ratio);
+            const sizeDelta = !defaultAvatarSize
+                ? Number.POSITIVE_INFINITY
+                : Math.max(
+                    Math.abs(defaultAvatarSize.width - nextEntry.width),
+                    Math.abs(defaultAvatarSize.height - nextEntry.height)
+                );
+            if (ratioDelta < 0.001 && sizeDelta < 1) {
+                return;
+            }
+            applyDefaultAvatarDimensions(defaultAvatarReferenceName, nextEntry);
+        };
+
+        if (previewEl.complete && previewEl.naturalWidth && previewEl.naturalHeight) {
+            commitDimensions();
+            return;
+        }
+
+        if (previewEl.dataset.aspectSyncPending === '1') {
+            return;
+        }
+
+        previewEl.dataset.aspectSyncPending = '1';
+        previewEl.addEventListener('load', () => {
+            delete previewEl.dataset.aspectSyncPending;
+            commitDimensions();
+        }, { once: true });
+    };
+    let defaultAvatarReferenceName = null;
+    const autoPositionedSlides = new Set();
+    let courseDownloadUrl = null;
+    let currentSessionId = null;
+
+    const getActiveAvatarPreviewSrc = () => {
+        if (defaultAvatarReferenceName && avatarThumbnailMap.has(defaultAvatarReferenceName)) {
+            return avatarThumbnailMap.get(defaultAvatarReferenceName);
+        }
+        return DEFAULT_AVATAR_REFERENCE_FALLBACK;
+    };
+
+    const updateOverlayPreview = (overlay) => {
+        if (!overlay) {
+            return;
+        }
+        const previewEl = overlay.querySelector('.selection-preview');
+        if (!previewEl) {
+            return;
+        }
+        const src = getActiveAvatarPreviewSrc();
+        if (previewEl.dataset.previewSrc === src) {
+            syncActiveAvatarAspectFromPreview(previewEl);
+            return;
+        }
+        previewEl.src = src;
+        previewEl.dataset.previewSrc = src;
+        syncActiveAvatarAspectFromPreview(previewEl);
+    };
+
+    const updateAllOverlayPreviews = () => {
+        slideElements.forEach(({ overlay }) => updateOverlayPreview(overlay));
+    };
+
+        const updateSlideVisibility = () => {
+            slideElements.forEach((elements, slideIndex) => {
+                if (slideIndex !== 1) {
+                    if (slidesExpanded) {
+                        elements.col.classList.remove('slide-hidden');
+                    } else {
+                        elements.col.classList.add('slide-hidden');
+                    }
+                } else {
+                    elements.col.classList.remove('slide-hidden');
+                }
+            });
+        };
+
+        const refreshExpandControl = () => {
+            if (slideElements.size <= 1) {
+                expandBtn.disabled = true;
+                expandBtn.textContent = '展开';
+            } else {
+                expandBtn.disabled = false;
+                expandBtn.textContent = slidesExpanded ? '收起' : '展开';
+            }
+        };
+
+        const stopAvatarProcessingAnimation = () => {
+            if (avatarProgressTimer) {
+                clearInterval(avatarProgressTimer);
+                avatarProgressTimer = null;
+            }
+        };
+
+        const setAvatarProgressBarState = (stateClass) => {
+            avatarProgressBar.className = 'progress-bar progress-bar-striped progress-bar-animated';
+            if (stateClass) {
+                avatarProgressBar.classList.add(stateClass);
+            }
+        };
+
+        const setAvatarProgressTextClass = (className = 'text-muted') => {
+            avatarProgressText.className = `small mt-2 ${className}`;
+        };
+
+        const setAvatarProgress = (value, text) => {
+            avatarProgressValue = Math.max(0, Math.min(100, value));
+            avatarProgressBar.style.width = `${avatarProgressValue}%`;
+            avatarProgressBar.setAttribute('aria-valuenow', avatarProgressValue);
+            if (typeof text === 'string') {
+                avatarProgressText.textContent = text;
+            }
+        };
+
+        const startAvatarProgress = () => {
+            if (avatarProgressHideTimer) {
+                clearTimeout(avatarProgressHideTimer);
+                avatarProgressHideTimer = null;
+            }
+            avatarProgress.style.display = 'block';
+            avatarProgressText.style.display = 'block';
+            setAvatarProgressBarState('bg-primary');
+            setAvatarProgressTextClass('text-muted');
+            setAvatarProgress(5, '准备上传...');
+        };
+
+        const startAvatarProcessingAnimation = (text) => {
+            stopAvatarProcessingAnimation();
+            const message = text || '上传完成，正在生成数字人...';
+            setAvatarProgressTextClass('text-primary');
+            if (avatarProgressValue < 70) {
+                setAvatarProgress(70, message);
+            } else {
+                setAvatarProgress(avatarProgressValue, message);
+            }
+            avatarProgressTimer = setInterval(() => {
+                if (avatarProgressValue >= 95) {
+                    stopAvatarProcessingAnimation();
+                    return;
+                }
+                setAvatarProgress(avatarProgressValue + 1);
+            }, 600);
+        };
+
+        const completeAvatarProgress = (text) => {
+            stopAvatarProcessingAnimation();
+            setAvatarProgressBarState('bg-success');
+            setAvatarProgressTextClass('text-success');
+            setAvatarProgress(100, text || '生成完成，服务即将重启...');
+        };
+
+        const failAvatarProgress = (text) => {
+            stopAvatarProcessingAnimation();
+            setAvatarProgressBarState('bg-danger');
+            setAvatarProgressTextClass('text-danger');
+            setAvatarProgress(Math.max(avatarProgressValue, 10), text || '生成失败，请稍后再试。');
+            if (avatarProgressHideTimer) {
+                clearTimeout(avatarProgressHideTimer);
+            }
+            avatarProgressHideTimer = setTimeout(() => {
+                hideAvatarProgress();
+            }, 2500);
+        };
+
+        const markAvatarRestartPending = (text) => {
+            stopAvatarProcessingAnimation();
+            if (avatarProgressHideTimer) {
+                clearTimeout(avatarProgressHideTimer);
+                avatarProgressHideTimer = null;
+            }
+            avatarProgress.style.display = 'block';
+            avatarProgressText.style.display = 'block';
+            setAvatarProgressBarState();
+            avatarProgressBar.classList.add('bg-warning');
+            avatarProgressBar.classList.add('text-dark');
+            setAvatarProgressTextClass('text-warning');
+            setAvatarProgress(Math.max(avatarProgressValue, 90), text || '服务可能正在重启，请稍候页面刷新...');
+        };
+
+        const hideAvatarProgress = () => {
+            stopAvatarProcessingAnimation();
+            if (avatarProgressHideTimer) {
+                clearTimeout(avatarProgressHideTimer);
+                avatarProgressHideTimer = null;
+            }
+            avatarProgress.style.display = 'none';
+            avatarProgressText.style.display = 'none';
+            setAvatarProgressBarState('bg-primary');
+            setAvatarProgress(0);
+            setAvatarProgressTextClass('text-muted');
+            avatarProgressText.textContent = '';
+        };
+
+        const renderAvatarOptions = (avatars = []) => {
+            avatarGallery.innerHTML = '';
+            if (selectedAvatarCard) {
+                selectedAvatarCard.classList.remove('selected');
+            }
+            selectedAvatarCard = null;
+            avatarThumbnailMap.clear();
+
+            if (!avatars.length) {
+                avatarGalleryPlaceholder.style.display = 'block';
+                avatarSelectBtn.innerHTML = avatarSelectDefault;
+                avatarSelectBtn.disabled = true;
+                setSelectionIdleStatus();
+                return;
+            }
+
+            avatarGalleryPlaceholder.style.display = 'none';
+            let foundSelected = false;
+            avatars.forEach((avatar) => {
+                if (avatar && avatar.name && avatar.thumbnail) {
+                    avatarThumbnailMap.set(avatar.name, avatar.thumbnail);
+                }
+                if (avatar && avatar.name && avatar.videoWidth && avatar.videoHeight) {
+                    registerAvatarDimensions(avatar.name, avatar.videoWidth, avatar.videoHeight);
+                }
+
+                const col = document.createElement('div');
+                col.className = 'col-lg-3 col-md-4 col-sm-6';
+                const card = document.createElement('div');
+                card.className = 'avatar-option h-100 d-flex flex-column';
+
+                const img = document.createElement('img');
+                img.src = avatar.thumbnail;
+                img.alt = avatar.name;
+
+                const nameLabel = document.createElement('div');
+                nameLabel.className = 'avatar-name';
+                nameLabel.textContent = avatar.name;
+
+                card.appendChild(img);
+                card.appendChild(nameLabel);
+                col.appendChild(card);
+                avatarGallery.appendChild(col);
+
+                if (selectedAvatarName && selectedAvatarName === avatar.name) {
+                    foundSelected = true;
+                    selectedAvatarCard = card;
+                    card.classList.add('selected');
+                    avatarSelectBtn.disabled = false;
+                }
+
+                card.addEventListener('click', () => {
+                    if (selectedAvatarCard) {
+                        selectedAvatarCard.classList.remove('selected');
+                    }
+                    selectedAvatarCard = card;
+                    selectedAvatarName = avatar.name;
+                    card.classList.add('selected');
+                    avatarSelectBtn.disabled = false;
+                    avatarSelectBtn.innerHTML = avatarSelectDefault;
+                    updateAvatarStatus('bg-info', '已选择', `将使用数字人 ${avatar.name}，点击确认按钮后服务将自动重启。`);
+                });
+            });
+
+            if (!foundSelected) {
+                selectedAvatarName = null;
+                avatarSelectBtn.innerHTML = avatarSelectDefault;
+                avatarSelectBtn.disabled = true;
+                setSelectionIdleStatus();
+            }
+            updateAllOverlayPreviews();
+        };
+
+        const loadCurrentAvatar = async () => {
+            try {
+                const response = await fetch('/avatar/current');
+                const result = await response.json();
+                if (!response.ok || result.code !== 0) {
+                    throw new Error(result.msg || '无法获取当前数字人');
+                }
+                activeAvatarName = result.avatarName || DEFAULT_AVATAR_REFERENCE_NAME;
+                if (result.thumbnail) {
+                    avatarThumbnailMap.set(activeAvatarName, result.thumbnail);
+                }
+                if (!selectedAvatarName) {
+                    selectedAvatarName = activeAvatarName;
+                }
+                const dimensionHint = (Number(result.videoWidth) > 0 && Number(result.videoHeight) > 0)
+                    ? { width: result.videoWidth, height: result.videoHeight }
+                    : null;
+                setDefaultAvatarReference(activeAvatarName, dimensionHint);
+                ensureDefaultAvatarDimensions().catch(() => {});
+            } catch (error) {
+                console.warn('load current avatar failed', error);
+                if (!activeAvatarName) {
+                    activeAvatarName = DEFAULT_AVATAR_REFERENCE_NAME;
+                }
+                if (!selectedAvatarName) {
+                    selectedAvatarName = activeAvatarName;
+                }
+                setDefaultAvatarReference(activeAvatarName);
+            } finally {
+                setSelectionIdleStatus();
+                updateAllOverlayPreviews();
+            }
+        };
+
+        const loadAvailableAvatars = async () => {
+            try {
+                avatarGalleryPlaceholder.style.display = 'none';
+                avatarGallery.innerHTML = '<div class="text-center text-secondary py-3">正在加载可选数字人...</div>';
+                const response = await fetch('/avatar/list');
+                const result = await response.json();
+                if (!response.ok || result.code !== 0) {
+                    throw new Error(result.msg || '数字人列表加载失败');
+                }
+                availableAvatars = result.avatars || [];
+                renderAvatarOptions(availableAvatars);
+                if (activeAvatarName && avatarDimensionCache.has(activeAvatarName)) {
+                    applyDefaultAvatarDimensions(activeAvatarName, avatarDimensionCache.get(activeAvatarName));
+                }
+                setSelectionIdleStatus();
+            } catch (error) {
+                console.error('load avatars failed', error);
+                avatarGallery.innerHTML = `<div class="text-danger small">加载数字人列表失败：${error.message}</div>`;
+                avatarGalleryPlaceholder.style.display = 'none';
+                setSelectionIdleStatus();
+                avatarSelectBtn.innerHTML = avatarSelectDefault;
+                avatarSelectBtn.disabled = true;
+                if (activeAvatarName) {
+                    setDefaultAvatarReference(activeAvatarName);
+                } else {
+                    setDefaultAvatarReference(DEFAULT_AVATAR_REFERENCE_NAME);
+                }
+            }
+        };
+
+        const sendAvatarGenerate = (formData) => new Promise((resolve, reject) => {
+            let settled = false;
+            const resolveOnce = (value) => {
+                if (settled) {
+                    return;
+                }
+                settled = true;
+                resolve(value);
+            };
+            const rejectOnce = (error) => {
+                if (settled) {
+                    return;
+                }
+                settled = true;
+                reject(error);
+            };
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/avatar/generate');
+            xhr.responseType = 'text';
+
+            startAvatarProgress();
+
+            xhr.upload.addEventListener('progress', (event) => {
+                if (event.lengthComputable && event.total > 0) {
+                    const percent = Math.round((event.loaded / event.total) * 100);
+                    const scaled = Math.min(60, Math.max(10, Math.round((event.loaded / event.total) * 60)));
+                    setAvatarProgress(scaled, `上传视频 ${percent}%`);
+                } else {
+                    setAvatarProgress(Math.min(avatarProgressValue + 5, 50), '正在上传视频...');
+                }
+            });
+
+            xhr.upload.addEventListener('load', () => {
+                setAvatarProgress(65, '上传完成，开始生成数字人...');
+                startAvatarProcessingAnimation();
+            });
+
+            xhr.addEventListener('readystatechange', () => {
+                if (xhr.readyState !== 4 || settled) {
+                    return;
+                }
+
+                const status = xhr.status;
+                const responseText = xhr.responseText || '';
+                let payload = null;
+                if (responseText) {
+                    try {
+                        payload = JSON.parse(responseText);
+                    } catch (err) {
+                        // ignore parse error
+                    }
+                }
+
+                if (status >= 200 && status < 300) {
+                    resolveOnce({ payload, responseText });
+                } else if (status === 0) {
+                    const err = new Error('请求已发送，服务可能正在重启，请稍后手动刷新页面。');
+                    err.isRestartLikely = true;
+                    err.payload = payload;
+                    err.responseText = responseText;
+                    rejectOnce(err);
+                } else {
+                    const message = (payload && payload.msg) || responseText || '生成失败，请稍后再试。';
+                    const err = new Error(message);
+                    err.payload = payload;
+                    err.responseText = responseText;
+                    rejectOnce(err);
+                }
+            });
+
+            xhr.addEventListener('error', () => {
+                const err = new Error('请求已发送，服务可能正在重启，请稍后手动刷新页面。');
+                err.isRestartLikely = true;
+                err.payload = null;
+                err.responseText = '';
+                rejectOnce(err);
+            });
+
+            xhr.send(formData);
+        });
+
+        const toggleCustomSection = (visible) => {
+            if (isRestartPending()) {
+                return;
+            }
+            customSectionVisible = visible;
+            avatarCustomToggleBtn.disabled = false;
+            avatarCustomSection.style.display = visible ? 'block' : 'none';
+            if (visible) {
+                avatarCustomToggleBtn.innerHTML = '<i class="bi bi-chevron-up me-2"></i>收起自定义';
+                setCustomIdleStatus();
+            } else {
+                avatarCustomToggleBtn.innerHTML = avatarCustomToggleDefault;
+                hideAvatarProgress();
+                avatarForm.reset();
+                avatarSubmitBtn.disabled = false;
+                avatarSubmitBtn.innerHTML = avatarSubmitDefault;
+                avatarNameInput.disabled = false;
+                avatarVideoInput.disabled = false;
+                avatarVideoStaticInput.disabled = false;
+                setSelectionIdleStatus();
+            }
+        };
+
+        const updateAvatarStatus = (badgeClass, badgeText, message) => {
+            avatarStatusBadge.className = `badge ${badgeClass}`;
+            avatarStatusBadge.textContent = badgeText;
+            avatarStatusText.textContent = message;
+            if (badgeClass.includes('text-dark')) {
+                avatarStatusText.className = 'text-dark';
+            } else if (badgeClass.includes('bg-success')) {
+                avatarStatusText.className = 'text-success';
+            } else if (badgeClass.includes('bg-danger')) {
+                avatarStatusText.className = 'text-danger';
+            } else if (badgeClass.includes('bg-warning')) {
+                avatarStatusText.className = 'text-warning';
+            } else if (badgeClass.includes('bg-info')) {
+                avatarStatusText.className = 'text-primary';
+            } else {
+                avatarStatusText.className = 'text-muted';
+            }
+        };
+
+        const isRestartPending = () =>
+            avatarSubmitBtn.innerHTML === '等待重启...' || avatarSelectBtn.innerHTML === '等待重启...';
+
+        const setSelectionIdleStatus = () => {
+            if (isRestartPending()) {
+                return;
+            }
+            if (selectedAvatarName) {
+                updateAvatarStatus('bg-info', '已选择', `将使用数字人 ${selectedAvatarName}，点击确认按钮后服务将自动重启。`);
+            } else {
+                updateAvatarStatus('bg-secondary', '待选择', '选择一个数字人或创建自定义。');
+            }
+        };
+
+        const setCustomIdleStatus = () => {
+            if (isRestartPending()) {
+                return;
+            }
+            updateAvatarStatus('bg-secondary', '待上传', '填写标识并上传两个视频以开始生成。');
+        };
+
+        const formatBytes = size => {
+            if (size === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(size) / Math.log(k));
+            return parseFloat((size / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        };
+
+        const updateFileLabel = (input, label) => {
+            if (input.files.length > 0) {
+                const file = input.files[0];
+                label.textContent = `${file.name} · ${formatBytes(file.size)}`;
+            } else {
+                label.textContent = '尚未选择文件';
+            }
+        };
+
+        const clampPosition = position => {
+            if (!position) return position;
+            const result = { ...position };
+            result.width = Math.max(MIN_BOX_RATIO, Math.min(1, result.width));
+            result.height = Math.max(MIN_BOX_RATIO, Math.min(1, result.height));
+            result.x = Math.max(0, Math.min(1 - result.width, result.x));
+            result.y = Math.max(0, Math.min(1 - result.height, result.y));
+            return result;
+        };
+
+        const computeNormalizedRatio = (rawRatio, basis = null) => {
+            if (!Number.isFinite(rawRatio) || rawRatio <= 0) {
+                return null;
+            }
+
+            let widthBasis = null;
+            let heightBasis = null;
+
+            if (basis && typeof basis === 'object') {
+                const candidateWidth = Number(basis.width ?? basis.containerWidth ?? basis.naturalWidth);
+                const candidateHeight = Number(basis.height ?? basis.containerHeight ?? basis.naturalHeight);
+                if (Number.isFinite(candidateWidth) && candidateWidth > 0 && Number.isFinite(candidateHeight) && candidateHeight > 0) {
+                    widthBasis = candidateWidth;
+                    heightBasis = candidateHeight;
+                }
+            }
+
+            if ((!widthBasis || !heightBasis) && slideMeta && Number(slideMeta.widthIn) > 0 && Number(slideMeta.heightIn) > 0) {
+                widthBasis = slideMeta.widthIn;
+                heightBasis = slideMeta.heightIn;
+            }
+
+            if (!widthBasis || !heightBasis) {
+                return rawRatio;
+            }
+
+            return rawRatio * (heightBasis / widthBasis);
+        };
+
+        const enforcePositionAspectRatio = (position, ratio) => {
+            if (!position || !Number.isFinite(ratio) || ratio <= 0) {
+                return position;
+            }
+
+            let { x, y, width, height } = position;
+            width = Number.isFinite(width) && width > 0 ? width : MIN_BOX_RATIO;
+            height = Number.isFinite(height) && height > 0 ? height : MIN_BOX_RATIO;
+            x = Number.isFinite(x) ? x : 0;
+            y = Number.isFinite(y) ? y : 0;
+
+            const centerX = x + width / 2;
+            const centerY = y + height / 2;
+            const candidates = [];
+
+            const buildCandidate = (preferWidthAdjustment) => {
+                let candidateWidth = width;
+                let candidateHeight = height;
+
+                if (preferWidthAdjustment) {
+                    candidateWidth = candidateHeight * ratio;
+                } else {
+                    candidateHeight = candidateWidth / ratio;
+                }
+
+                if (!Number.isFinite(candidateWidth) || !Number.isFinite(candidateHeight)) {
+                    return;
+                }
+
+                const applyConstraints = () => {
+                    if (candidateWidth < MIN_BOX_RATIO) {
+                        candidateWidth = MIN_BOX_RATIO;
+                        candidateHeight = candidateWidth / ratio;
+                    }
+                    if (candidateHeight < MIN_BOX_RATIO) {
+                        candidateHeight = MIN_BOX_RATIO;
+                        candidateWidth = candidateHeight * ratio;
+                    }
+                    if (candidateWidth > 1) {
+                        candidateWidth = 1;
+                        candidateHeight = candidateWidth / ratio;
+                    }
+                    if (candidateHeight > 1) {
+                        candidateHeight = 1;
+                        candidateWidth = candidateHeight * ratio;
+                    }
+                };
+
+                for (let i = 0; i < 3; i += 1) {
+                    applyConstraints();
+                }
+
+                if (
+                    candidateWidth > 1 ||
+                    candidateHeight > 1 ||
+                    candidateWidth < MIN_BOX_RATIO ||
+                    candidateHeight < MIN_BOX_RATIO
+                ) {
+                    return;
+                }
+
+                let candidateX = centerX - candidateWidth / 2;
+                let candidateY = centerY - candidateHeight / 2;
+                candidateX = Math.max(0, Math.min(1 - candidateWidth, candidateX));
+                candidateY = Math.max(0, Math.min(1 - candidateHeight, candidateY));
+
+                candidates.push({
+                    x: candidateX,
+                    y: candidateY,
+                    width: candidateWidth,
+                    height: candidateHeight,
+                    delta: Math.abs(candidateWidth - width) + Math.abs(candidateHeight - height),
+                });
+            };
+
+            buildCandidate(true);
+            buildCandidate(false);
+
+            if (!candidates.length) {
+                return clampPosition(position);
+            }
+
+            candidates.sort((a, b) => a.delta - b.delta);
+            const best = candidates[0];
+            return {
+                x: best.x,
+                y: best.y,
+                width: best.width,
+                height: best.height,
+            };
+        };
+
+        const applyOverlayPosition = (overlay, position, canvasElement = null, imageElement = null, metricsOverride = null) => {
+            if (!overlay || !position) {
+                return;
+            }
+
+            const canvasEl = canvasElement || overlay.parentElement;
+            const metrics = metricsOverride || (canvasEl ? getSlideContentMetrics(canvasEl, imageElement) : null);
+            const baseWidth = metrics ? metrics.width : (canvasEl?.clientWidth || 0);
+            const baseHeight = metrics ? metrics.height : (canvasEl?.clientHeight || 0);
+            const offsetLeft = metrics ? metrics.offsetLeft : 0;
+            const offsetTop = metrics ? metrics.offsetTop : 0;
+
+            if (!baseWidth || !baseHeight) {
+                overlay.style.left = `${position.x * 100}%`;
+                overlay.style.top = `${position.y * 100}%`;
+                overlay.style.width = `${position.width * 100}%`;
+                overlay.style.height = `${position.height * 100}%`;
+                return;
+            }
+
+            overlay.style.left = `${offsetLeft + (position.x * baseWidth)}px`;
+            overlay.style.top = `${offsetTop + (position.y * baseHeight)}px`;
+            overlay.style.width = `${position.width * baseWidth}px`;
+            overlay.style.height = `${position.height * baseHeight}px`;
+        };
+
+        const positionSummaryText = position => {
+            const x = Math.round(position.x * 100);
+            const y = Math.round(position.y * 100);
+            const w = Math.round(position.width * 100);
+            const h = Math.round(position.height * 100);
+            return `位置 (${x}%, ${y}%) · 尺寸 ${w}% × ${h}%`;
+        };
+
+        const updatePositionsInput = () => {
+            positionsInput.value = JSON.stringify(slidePositions || {});
+        };
+
+        const getSlideImageSize = (imageElement) => {
+            if (!imageElement) {
+                return null;
+            }
+            const width = imageElement.naturalWidth || imageElement.width || imageElement.clientWidth;
+            const height = imageElement.naturalHeight || imageElement.height || imageElement.clientHeight;
+            if (!width || !height) {
+                return null;
+            }
+            return { width, height };
+        };
+
+        const getSlideContentMetrics = (canvasElement, imageElement) => {
+            if (!canvasElement) {
+                return null;
+            }
+            const containerWidth = canvasElement.clientWidth;
+            const containerHeight = canvasElement.clientHeight;
+            if (!containerWidth || !containerHeight) {
+                return null;
+            }
+
+            const naturalWidth = imageElement?.naturalWidth || imageElement?.width || 0;
+            const naturalHeight = imageElement?.naturalHeight || imageElement?.height || 0;
+
+            let displayWidth = containerWidth;
+            let displayHeight = containerHeight;
+
+            if (naturalWidth > 0 && naturalHeight > 0) {
+                const containerRatio = containerWidth / containerHeight;
+                const imageRatio = naturalWidth / naturalHeight;
+                if (imageRatio > containerRatio) {
+                    displayWidth = containerWidth;
+                    displayHeight = containerWidth / imageRatio;
+                } else {
+                    displayHeight = containerHeight;
+                    displayWidth = containerHeight * imageRatio;
+                }
+            }
+
+            const offsetLeft = (containerWidth - displayWidth) / 2;
+            const offsetTop = (containerHeight - displayHeight) / 2;
+
+            return {
+                width: displayWidth,
+                height: displayHeight,
+                offsetLeft,
+                offsetTop,
+                containerWidth,
+                containerHeight,
+            };
+        };
+
+        const computeDefaultPosition = (slideImageSize) => {
+            const base = (() => {
+                if (!slideMeta) {
+                    return { x: 0.6, y: 0.1, width: 0.35, height: 0.35 };
+                }
+                const { widthIn, heightIn } = slideMeta;
+                return {
+                    x: DEFAULT_POSITION_INCH.left / Math.max(widthIn, 0.01),
+                    y: DEFAULT_POSITION_INCH.top / Math.max(heightIn, 0.01),
+                    width: DEFAULT_POSITION_INCH.width / Math.max(widthIn, 0.01),
+                    height: DEFAULT_POSITION_INCH.height / Math.max(heightIn, 0.01),
+                };
+            })();
+
+            const appliedRatio = defaultAvatarRatio || (defaultAvatarSize && defaultAvatarSize.width > 0 && defaultAvatarSize.height > 0
+                ? (defaultAvatarSize.width / defaultAvatarSize.height)
+                : null);
+            const normalizedRatio = computeNormalizedRatio(appliedRatio, slideImageSize);
+
+            if (
+                defaultAvatarSize &&
+                slideImageSize &&
+                slideImageSize.width > 0 &&
+                slideImageSize.height > 0 &&
+                defaultAvatarSize.width > 0 &&
+                defaultAvatarSize.height > 0 &&
+                Number.isFinite(appliedRatio) &&
+                appliedRatio > 0
+            ) {
+                const ratio = appliedRatio;
+                const widthLimit = Math.min(defaultAvatarSize.width / slideImageSize.width, 1);
+                const heightLimit = Math.min(defaultAvatarSize.height / slideImageSize.height, 1);
+                let heightRatio = Math.min(heightLimit, ratio > 0 ? widthLimit / ratio : heightLimit);
+                heightRatio = Math.max(MIN_BOX_RATIO, heightRatio);
+                let widthRatio = ratio > 0 ? heightRatio * ratio : heightRatio;
+                if (widthRatio > 1) {
+                    widthRatio = 1;
+                    heightRatio = Math.min(1, ratio > 0 ? widthRatio / ratio : widthRatio);
+                }
+                if (widthRatio < MIN_BOX_RATIO) {
+                    widthRatio = MIN_BOX_RATIO;
+                    heightRatio = Math.min(1, ratio > 0 ? widthRatio / ratio : widthRatio);
+                }
+                base.width = Math.min(1, Math.max(MIN_BOX_RATIO, widthRatio));
+                base.height = Math.min(1, Math.max(MIN_BOX_RATIO, heightRatio));
+            }
+
+            if (DEFAULT_OVERLAY_SCALE > 0 && DEFAULT_OVERLAY_SCALE < 1) {
+                base.width *= DEFAULT_OVERLAY_SCALE;
+                base.height *= DEFAULT_OVERLAY_SCALE;
+            }
+
+            let result = base;
+            if (Number.isFinite(normalizedRatio) && normalizedRatio > 0) {
+                result = enforcePositionAspectRatio(result, normalizedRatio);
+            }
+            result = clampPosition(result);
+            if (Number.isFinite(normalizedRatio) && normalizedRatio > 0) {
+                result = enforcePositionAspectRatio(result, normalizedRatio);
+            }
+            return result;
+        };
+
+        const reapplyAutoPositionsWithAvatarSize = () => {
+            if (!defaultAvatarSize || !defaultAvatarRatio) {
+                return;
+            }
+            autoPositionedSlides.forEach((slideIndex) => {
+                const elements = slideElements.get(slideIndex);
+                if (!elements || !elements.image) {
+                    return;
+                }
+                const slideSize = getSlideImageSize(elements.image);
+                if (!slideSize) {
+                    return;
+                }
+                const position = computeDefaultPosition(slideSize);
+                setSlidePosition(slideIndex, position, elements.overlay, elements.info, {
+                    auto: true,
+                    canvas: elements.canvas,
+                    image: elements.image,
+                });
+            });
+        };
+
+        const normalizeSlidePositionsWithAspectRatio = () => {
+            if (!Number.isFinite(defaultAvatarRatio) || defaultAvatarRatio <= 0) {
+                return;
+            }
+            slideElements.forEach((elements, slideIndex) => {
+                if (!elements || !slidePositions[slideIndex]) {
+                    return;
+                }
+                const autoFlag = autoPositionedSlides.has(slideIndex);
+                setSlidePosition(slideIndex, slidePositions[slideIndex], elements.overlay, elements.info, {
+                    auto: autoFlag,
+                    canvas: elements.canvas,
+                    image: elements.image,
+                });
+            });
+        };
+
+        const refreshOverlayLayout = () => {
+            if (!slideElements.size) {
+                return;
+            }
+            slideElements.forEach((elements, slideIndex) => {
+                const stored = slidePositions[slideIndex];
+                if (!elements || !stored) {
+                    return;
+                }
+                const autoFlag = autoPositionedSlides.has(slideIndex);
+                setSlidePosition(slideIndex, stored, elements.overlay, elements.info, {
+                    auto: autoFlag,
+                    canvas: elements.canvas,
+                    image: elements.image,
+                    enforceRatio: autoFlag ? undefined : false,
+                });
+            });
+        };
+
+        const loadAvatarDimensions = (avatarName) => {
+            if (!avatarName) {
+                return Promise.reject(new Error('invalid avatar name'));
+            }
+            if (avatarDimensionCache.has(avatarName)) {
+                return Promise.resolve(avatarDimensionCache.get(avatarName));
+            }
+            if (avatarDimensionLoaders.has(avatarName)) {
+                return avatarDimensionLoaders.get(avatarName);
+            }
+
+            const thumbnailSrc = avatarThumbnailMap.get(avatarName) || DEFAULT_AVATAR_REFERENCE_FALLBACK;
+            const promise = new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => {
+                    const width = img.naturalWidth || img.width;
+                    const height = img.naturalHeight || img.height;
+                    const entry = registerAvatarDimensions(avatarName, width, height);
+                    avatarDimensionLoaders.delete(avatarName);
+                    if (!entry) {
+                        reject(new Error('无法获取数字人预览尺寸'));
+                        return;
+                    }
+                    resolve(entry);
+                };
+                img.onerror = () => {
+                    avatarDimensionLoaders.delete(avatarName);
+                    reject(new Error('数字人预览图加载失败'));
+                };
+                img.src = thumbnailSrc;
+            });
+
+            avatarDimensionLoaders.set(avatarName, promise);
+            return promise;
+        };
+
+        const applyDefaultAvatarDimensions = (avatarName, dimensions) => {
+            if (!dimensions || !dimensions.width || !dimensions.height) {
+                return;
+            }
+            if (defaultAvatarReferenceName !== avatarName) {
+                return;
+            }
+            defaultAvatarSize = { width: dimensions.width, height: dimensions.height };
+            defaultAvatarRatio = dimensions.ratio || (dimensions.width / dimensions.height);
+            updateAllOverlayPreviews();
+            reapplyAutoPositionsWithAvatarSize();
+            normalizeSlidePositionsWithAspectRatio();
+        };
+
+        const setDefaultAvatarReference = (avatarName, dimensions = null) => {
+            if (!avatarName) {
+                defaultAvatarReferenceName = null;
+                defaultAvatarSize = null;
+                defaultAvatarRatio = null;
+                updateAllOverlayPreviews();
+                return;
+            }
+
+            defaultAvatarReferenceName = avatarName;
+
+            let providedEntry = null;
+            if (dimensions && typeof dimensions === 'object') {
+                const widthValue = dimensions.width ?? dimensions.videoWidth ?? dimensions.w ?? dimensions[0];
+                const heightValue = dimensions.height ?? dimensions.videoHeight ?? dimensions.h ?? dimensions[1];
+                providedEntry = registerAvatarDimensions(avatarName, widthValue, heightValue);
+            }
+
+            updateAllOverlayPreviews();
+
+            const cached = providedEntry || avatarDimensionCache.get(avatarName);
+            if (cached) {
+                applyDefaultAvatarDimensions(avatarName, cached);
+                return;
+            }
+
+            loadAvatarDimensions(avatarName)
+                .then(entry => applyDefaultAvatarDimensions(avatarName, entry))
+                .catch(error => {
+                    console.warn('load avatar dimensions failed', error);
+                });
+        };
+
+        const ensureDefaultAvatarDimensions = () => {
+            if (!defaultAvatarReferenceName) {
+                return Promise.resolve();
+            }
+            if (defaultAvatarSize && defaultAvatarRatio) {
+                return Promise.resolve();
+            }
+            if (avatarDimensionCache.has(defaultAvatarReferenceName)) {
+                applyDefaultAvatarDimensions(defaultAvatarReferenceName, avatarDimensionCache.get(defaultAvatarReferenceName));
+                return Promise.resolve();
+            }
+            const pending = avatarDimensionLoaders.get(defaultAvatarReferenceName);
+            if (pending) {
+                return pending
+                    .then(dimensions => applyDefaultAvatarDimensions(defaultAvatarReferenceName, dimensions))
+                    .catch(error => {
+                        console.warn('ensure default avatar dimensions failed', error);
+                    });
+            }
+            return loadAvatarDimensions(defaultAvatarReferenceName)
+                .then(dimensions => applyDefaultAvatarDimensions(defaultAvatarReferenceName, dimensions))
+                .catch(error => {
+                    console.warn('ensure default avatar dimensions failed', error);
+                });
+        };
+
+        const setSlidePosition = (slideIndex, position, overlay, infoLabel, options = {}) => {
+            const canvasElement = options.canvas || overlay?.parentElement || null;
+            const imageElement = options.image || null;
+            const metrics = options.metrics || (canvasElement ? getSlideContentMetrics(canvasElement, imageElement) : null);
+
+            const ratioHintRaw = options.enforceRatio === false
+                ? null
+                : (defaultAvatarRatio || (defaultAvatarSize && defaultAvatarSize.width > 0 && defaultAvatarSize.height > 0
+                    ? defaultAvatarSize.width / defaultAvatarSize.height
+                    : null));
+            const ratioHint = computeNormalizedRatio(ratioHintRaw, metrics);
+
+            let nextPosition = position ? { ...position } : { x: 0, y: 0, width: MIN_BOX_RATIO, height: MIN_BOX_RATIO };
+
+            if (Number.isFinite(ratioHint) && ratioHint > 0) {
+                nextPosition = enforcePositionAspectRatio(nextPosition, ratioHint);
+            }
+
+            nextPosition = clampPosition(nextPosition);
+
+            if (Number.isFinite(ratioHint) && ratioHint > 0) {
+                nextPosition = enforcePositionAspectRatio(nextPosition, ratioHint);
+            }
+
+            slidePositions[slideIndex] = nextPosition;
+            applyOverlayPosition(overlay, nextPosition, canvasElement, imageElement, metrics);
+            infoLabel.textContent = positionSummaryText(nextPosition);
+
+            if (options.auto) {
+                autoPositionedSlides.add(slideIndex);
+            } else {
+                autoPositionedSlides.delete(slideIndex);
+            }
+            updatePositionsInput();
+        };
+
+        const attachInteractions = (container, overlay, handle, slideIndex, infoLabel, imageElement) => {
+            const startInteraction = (event, type) => {
+                const containerRect = container.getBoundingClientRect();
+                const metrics = getSlideContentMetrics(container, imageElement);
+                const contentRect = {
+                    left: containerRect.left + (metrics?.offsetLeft || 0),
+                    top: containerRect.top + (metrics?.offsetTop || 0),
+                    width: metrics?.width || containerRect.width,
+                    height: metrics?.height || containerRect.height,
+                };
+                const overlayRect = overlay.getBoundingClientRect();
+                interactionState = {
+                    type,
+                    slideIndex,
+                    overlay,
+                    infoLabel,
+                    container,
+                    image: imageElement,
+                    rect: contentRect,
+                    startX: event.clientX,
+                    startY: event.clientY,
+                    box: {
+                        left: overlayRect.left - contentRect.left,
+                        top: overlayRect.top - contentRect.top,
+                        width: overlayRect.width,
+                        height: overlayRect.height,
+                    },
+                };
+                event.preventDefault();
+            };
+
+            overlay.addEventListener('mousedown', event => {
+                const type = event.target === handle ? 'resize' : 'move';
+                startInteraction(event, type);
+            });
+
+            container.addEventListener('mousedown', event => {
+                if (event.target !== container) return;
+                const containerRect = container.getBoundingClientRect();
+                const metrics = getSlideContentMetrics(container, imageElement);
+                const contentRect = {
+                    left: containerRect.left + (metrics?.offsetLeft || 0),
+                    top: containerRect.top + (metrics?.offsetTop || 0),
+                    width: metrics?.width || containerRect.width,
+                    height: metrics?.height || containerRect.height,
+                };
+                const normalizedRatio = computeNormalizedRatio(
+                    defaultAvatarRatio || (defaultAvatarSize && defaultAvatarSize.width > 0 && defaultAvatarSize.height > 0
+                        ? defaultAvatarSize.width / defaultAvatarSize.height
+                        : 1),
+                    metrics
+                ) || 1;
+                let widthRatio = Math.max(MIN_BOX_RATIO, 0.3);
+                let heightRatio = widthRatio / normalizedRatio;
+                if (!Number.isFinite(heightRatio) || heightRatio <= 0) {
+                    heightRatio = widthRatio;
+                }
+                if (heightRatio > 1) {
+                    heightRatio = 1;
+                    widthRatio = Math.min(1, heightRatio * normalizedRatio);
+                }
+                if (heightRatio < MIN_BOX_RATIO) {
+                    heightRatio = MIN_BOX_RATIO;
+                    widthRatio = Math.min(1, heightRatio * normalizedRatio);
+                }
+                if (widthRatio > 1) {
+                    widthRatio = 1;
+                    heightRatio = Math.min(1, widthRatio / normalizedRatio);
+                }
+                if (widthRatio < MIN_BOX_RATIO) {
+                    widthRatio = MIN_BOX_RATIO;
+                    heightRatio = Math.min(1, widthRatio / normalizedRatio);
+                }
+                const pointerX = event.clientX - contentRect.left;
+                const pointerY = event.clientY - contentRect.top;
+                const normalizedX = contentRect.width > 0 ? pointerX / contentRect.width : 0;
+                const normalizedY = contentRect.height > 0 ? pointerY / contentRect.height : 0;
+                const x = Math.min(Math.max(normalizedX - widthRatio / 2, 0), 1 - widthRatio);
+                const y = Math.min(Math.max(normalizedY - heightRatio / 2, 0), 1 - heightRatio);
+                setSlidePosition(slideIndex, { x, y, width: widthRatio, height: heightRatio }, overlay, infoLabel, {
+                    canvas: container,
+                    image: imageElement,
+                    metrics,
+                });
+            });
+        };
+
+        document.addEventListener('mousemove', event => {
+            if (!interactionState) return;
+            const { type, overlay, rect, box, container, image } = interactionState;
+            let deltaX = event.clientX - interactionState.startX;
+            let deltaY = event.clientY - interactionState.startY;
+            let left = box.left;
+            let top = box.top;
+            let width = box.width;
+            let height = box.height;
+            const rectWidth = rect.width || 1;
+            const rectHeight = rect.height || 1;
+
+            if (type === 'move') {
+                left = Math.min(Math.max(0, left + deltaX), rectWidth - width);
+                top = Math.min(Math.max(0, top + deltaY), rectHeight - height);
+            } else {
+                const ratio = defaultAvatarRatio || (box.width && box.height ? box.width / box.height : 1);
+                width = Math.max(MIN_BOX_PX, width + deltaX);
+                let heightCalculated = width / ratio;
+
+                if (heightCalculated < MIN_BOX_PX) {
+                    heightCalculated = MIN_BOX_PX;
+                    width = heightCalculated * ratio;
+                }
+
+                if (left + width > rectWidth) {
+                    width = rectWidth - left;
+                    heightCalculated = width / ratio;
+                }
+                if (top + heightCalculated > rectHeight) {
+                    heightCalculated = rectHeight - top;
+                    width = heightCalculated * ratio;
+                    if (left + width > rectWidth) {
+                        width = rectWidth - left;
+                        heightCalculated = width / ratio;
+                    }
+                }
+
+                width = Math.min(rectWidth, Math.max(MIN_BOX_PX, width));
+                height = Math.min(rectHeight, Math.max(MIN_BOX_PX, heightCalculated));
+            }
+
+            const position = clampPosition({
+                x: left / rectWidth,
+                y: top / rectHeight,
+                width: width / rectWidth,
+                height: height / rectHeight,
+            });
+            applyOverlayPosition(overlay, position, container, image);
+            interactionState.infoLabel.textContent = positionSummaryText(position);
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (!interactionState) return;
+            const overlay = interactionState.overlay;
+            const containerElement = interactionState.container;
+            const imageElement = interactionState.image;
+            const containerRect = containerElement.getBoundingClientRect();
+            const metrics = getSlideContentMetrics(containerElement, imageElement);
+            const contentRect = {
+                left: containerRect.left + (metrics?.offsetLeft || 0),
+                top: containerRect.top + (metrics?.offsetTop || 0),
+                width: metrics?.width || containerRect.width,
+                height: metrics?.height || containerRect.height,
+            };
+            const overlayRect = overlay.getBoundingClientRect();
+            const widthDenom = contentRect.width || 1;
+            const heightDenom = contentRect.height || 1;
+            const position = clampPosition({
+                x: (overlayRect.left - contentRect.left) / widthDenom,
+                y: (overlayRect.top - contentRect.top) / heightDenom,
+                width: overlayRect.width / widthDenom,
+                height: overlayRect.height / heightDenom,
+            });
+            setSlidePosition(interactionState.slideIndex, position, overlay, interactionState.infoLabel, {
+                canvas: containerElement,
+                image: imageElement,
+                metrics,
+            });
+            interactionState = null;
+        });
+
+        const buildSlidePreview = (slideSrc, index) => {
+            const col = document.createElement('div');
+            col.className = 'col-xl-4 col-md-6';
+
+            const card = document.createElement('div');
+            card.className = 'slide-preview card h-100';
+
+            const header = document.createElement('div');
+            header.className = 'card-header d-flex justify-content-between align-items-center py-3 px-3';
+            const title = document.createElement('span');
+            title.className = 'fw-semibold text-primary';
+            title.textContent = `第 ${index} 页`;
+            const info = document.createElement('span');
+            info.className = 'badge rounded-pill text-bg-light text-secondary';
+            header.appendChild(title);
+            header.appendChild(info);
+
+            const resetBtn = document.createElement('button');
+            resetBtn.type = 'button';
+            resetBtn.className = 'btn btn-outline-secondary btn-sm';
+            resetBtn.innerHTML = '<i class="bi bi-arrow-counterclockwise me-1"></i>恢复默认';
+            header.appendChild(resetBtn);
+
+            const canvas = document.createElement('div');
+            canvas.className = 'slide-canvas';
+            canvas.dataset.slideIndex = index;
+
+            const img = document.createElement('img');
+            img.src = slideSrc;
+            img.alt = `Slide ${index}`;
+
+            const overlay = document.createElement('div');
+            overlay.className = 'selection-box';
+            const overlayPreview = document.createElement('img');
+            overlayPreview.className = 'selection-preview';
+            overlayPreview.alt = 'avatar preview';
+            overlayPreview.draggable = false;
+            const handle = document.createElement('div');
+            handle.className = 'resize-handle';
+            overlay.appendChild(overlayPreview);
+            overlay.appendChild(handle);
+            updateOverlayPreview(overlay);
+
+            canvas.appendChild(img);
+            canvas.appendChild(overlay);
+
+            card.appendChild(header);
+            card.appendChild(canvas);
+            col.appendChild(card);
+            previewSlides.appendChild(col);
+
+            const initializePosition = () => {
+                const slideSize = getSlideImageSize(img);
+                if (slidePositions[index]) {
+                    setSlidePosition(index, slidePositions[index], overlay, info, {
+                        auto: autoPositionedSlides.has(index),
+                        canvas,
+                        image: img,
+                    });
+                    return;
+                }
+                const defaultPos = computeDefaultPosition(slideSize);
+                setSlidePosition(index, defaultPos, overlay, info, {
+                    auto: true,
+                    canvas,
+                    image: img,
+                });
+            };
+
+            if (img.complete && img.naturalWidth) {
+                initializePosition();
+            } else {
+                img.addEventListener('load', initializePosition, { once: true });
+            }
+            attachInteractions(canvas, overlay, handle, index, info, img);
+
+            slideElements.set(index, { col, overlay, info, image: img, canvas });
+
+            resetBtn.addEventListener('click', () => {
+                const slideSize = getSlideImageSize(img);
+                const defaultPos = computeDefaultPosition(slideSize);
+                setSlidePosition(index, defaultPos, overlay, info, {
+                    auto: true,
+                    canvas,
+                    image: img,
+                });
+            });
+        };
+
+        let resizeRafId = null;
+        window.addEventListener('resize', () => {
+            if (resizeRafId) {
+                cancelAnimationFrame(resizeRafId);
+            }
+            resizeRafId = requestAnimationFrame(() => {
+                resizeRafId = null;
+                refreshOverlayLayout();
+            });
+        });
+
+        const clearPreview = () => {
+            if (resizeRafId) {
+                cancelAnimationFrame(resizeRafId);
+                resizeRafId = null;
+            }
+            previewSlides.innerHTML = '';
+            previewLoader.style.display = 'none';
+            previewLoader.innerHTML = previewLoaderDefault;
+            previewPlaceholder.style.display = 'block';
+            previewPlaceholder.innerHTML = previewPlaceholderDefault;
+            previewMeta.textContent = '上传 PPT 后将在此显示幻灯片预览';
+            slideMeta = null;
+            slidePositions = {};
+            slideElements = new Map();
+            autoPositionedSlides.clear();
+            slidesExpanded = false;
+            applyAllBtn.disabled = true;
+            applyAllBtn.textContent = '应用到全部';
+            updatePositionsInput();
+            refreshExpandControl();
+        };
+
+        const loadPreview = async () => {
+            if (!pptInput.files.length) {
+                clearPreview();
+                return;
+            }
+
+            const pptFile = pptInput.files[0];
+            const formData = new FormData();
+            formData.append('ppt', pptFile);
+
+            previewPlaceholder.style.display = 'none';
+            previewPlaceholder.innerHTML = previewPlaceholderDefault;
+            previewLoader.style.display = 'block';
+            previewLoader.innerHTML = previewLoaderDefault;
+
+            try {
+                await ensureDefaultAvatarDimensions();
+                const response = await fetch('/ppt/preview', {
+                    method: 'POST',
+                    body: formData,
+                });
+                const result = await response.json();
+                if (!response.ok || result.code !== 0) {
+                    throw new Error(result.msg || '无法生成幻灯片预览');
+                }
+
+                slideMeta = { widthIn: result.slideWidthIn, heightIn: result.slideHeightIn };
+                previewMeta.textContent = `幻灯片尺寸约 ${slideMeta.widthIn.toFixed(1)}" × ${slideMeta.heightIn.toFixed(1)}"`;
+                slidePositions = {};
+                updatePositionsInput();
+                previewSlides.innerHTML = '';
+                previewLoader.style.display = 'none';
+                slideElements = new Map();
+                autoPositionedSlides.clear();
+                slidesExpanded = result.images.length <= 1;
+                applyAllBtn.disabled = result.images.length <= 1;
+                applyAllBtn.textContent = '应用到全部';
+
+                result.images.forEach((src, idx) => {
+                    const slideIndex = idx + 1;
+                    buildSlidePreview(src, slideIndex);
+                });
+
+                updateSlideVisibility();
+                refreshExpandControl();
+                refreshOverlayLayout();
+
+                if (!result.images.length) {
+                    previewPlaceholder.style.display = 'block';
+                    previewPlaceholder.innerHTML = '<div class="text-danger">未能生成幻灯片预览，请确认机器已安装 Microsoft PowerPoint。</div>';
+                    refreshExpandControl();
+                    applyAllBtn.disabled = true;
+                }
+            } catch (error) {
+                console.error('预览加载失败', error);
+                previewLoader.style.display = 'none';
+                previewPlaceholder.style.display = 'block';
+                previewPlaceholder.innerHTML = `<div class="text-danger">预览失败：${error.message}</div>`;
+                previewSlides.innerHTML = '';
+                slideMeta = null;
+                slidePositions = {};
+                slideElements = new Map();
+                autoPositionedSlides.clear();
+                slidesExpanded = false;
+                applyAllBtn.disabled = true;
+                applyAllBtn.textContent = '应用到全部';
+                refreshExpandControl();
+                updatePositionsInput();
+            }
+        };
+
+        docInput.addEventListener('change', () => updateFileLabel(docInput, docFilename));
+
+        avatarForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const avatarName = avatarNameInput.value.trim();
+            if (!AVATAR_NAME_PATTERN.test(avatarName)) {
+                alert('请输入有效的数字人标识，仅支持字母、数字、下划线、短横线，长度 1-32。');
+                return;
+            }
+
+            if (!avatarVideoInput.files.length) {
+                alert('请选择用于生成数字人的驱动视频。');
+                return;
+            }
+
+            if (!avatarVideoStaticInput.files.length) {
+                alert('请选择用于提取画面与音频的静态展示视频。');
+                return;
+            }
+
+            const videoFile = avatarVideoInput.files[0];
+            const staticVideoFile = avatarVideoStaticInput.files[0];
+            avatarSubmitBtn.disabled = true;
+            avatarSubmitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>生成中...';
+            updateAvatarStatus('bg-info', '处理中', '正在上传视频并生成数字人，请稍候不要关闭页面。');
+            avatarNameInput.disabled = true;
+            avatarVideoInput.disabled = true;
+            avatarVideoStaticInput.disabled = true;
+
+            const formData = new FormData();
+            formData.append('avatarName', avatarName);
+            formData.append('video', videoFile);
+            formData.append('video_static', staticVideoFile);
+
+            try {
+                const { payload: result, responseText } = await sendAvatarGenerate(formData);
+                if (!result || result.code !== 0) {
+                    throw Object.assign(
+                        new Error((result && result.msg) || responseText || '生成失败，请稍后重试。'),
+                        { payload: result, responseText }
+                    );
+                }
+
+                updateAvatarStatus('bg-success', '完成', result.msg || '数字人生成成功，服务即将重启。');
+                completeAvatarProgress(result.msg || '数字人生成成功，服务即将重启。');
+                avatarSubmitBtn.innerHTML = '等待重启...';
+                avatarSubmitBtn.disabled = true;
+                avatarNameInput.disabled = true;
+                avatarVideoInput.disabled = true;
+                avatarVideoStaticInput.disabled = true;
+                avatarCustomToggleBtn.disabled = true;
+                setTimeout(() => {
+                    window.location.reload();
+                }, 8000);
+            } catch (error) {
+                console.error('avatar generate failed', error);
+                const message = error.message || '生成失败，请稍后重试。';
+                if (error.isRestartLikely) {
+                    updateAvatarStatus('bg-warning text-dark', '重启中', message);
+                    avatarSubmitBtn.innerHTML = '等待重启...';
+                    avatarSubmitBtn.disabled = true;
+                    avatarNameInput.disabled = true;
+                    avatarVideoInput.disabled = true;
+                    avatarVideoStaticInput.disabled = true;
+                    avatarCustomToggleBtn.disabled = true;
+                    markAvatarRestartPending(message);
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 8000);
+                    return;
+                }
+                updateAvatarStatus('bg-danger', '失败', message);
+                failAvatarProgress(message);
+                avatarSubmitBtn.disabled = false;
+                avatarSubmitBtn.innerHTML = avatarSubmitDefault;
+                avatarNameInput.disabled = false;
+                avatarVideoInput.disabled = false;
+                avatarVideoStaticInput.disabled = false;
+                avatarCustomToggleBtn.disabled = false;
+            }
+        });
+
+        avatarNameInput.addEventListener('input', () => {
+            if (!customSectionVisible) {
+                return;
+            }
+            setCustomIdleStatus();
+        });
+        avatarVideoInput.addEventListener('change', () => {
+            if (!customSectionVisible) {
+                return;
+            }
+            setCustomIdleStatus();
+        });
+        avatarVideoStaticInput.addEventListener('change', () => {
+            if (!customSectionVisible) {
+                return;
+            }
+            setCustomIdleStatus();
+        });
+
+        avatarCustomToggleBtn.addEventListener('click', () => {
+            toggleCustomSection(!customSectionVisible);
+        });
+
+        avatarSelectBtn.addEventListener('click', async () => {
+            if (!selectedAvatarName || avatarSelectBtn.disabled) {
+                return;
+            }
+            avatarSelectBtn.disabled = true;
+            avatarSelectBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>切换中...';
+            updateAvatarStatus('bg-info', '切换中', `正在应用数字人 ${selectedAvatarName}，请稍候。`);
+            avatarCustomToggleBtn.disabled = true;
+            try {
+                const response = await fetch('/avatar/select', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ avatarName: selectedAvatarName }),
+                });
+                const result = await response.json().catch(() => ({ code: -1, msg: '服务返回数据格式异常' }));
+                if (!response.ok || result.code !== 0) {
+                    throw new Error(result.msg || '切换失败，请稍后再试。');
+                }
+                updateAvatarStatus('bg-success', '完成', result.msg || `已切换至数字人 ${selectedAvatarName}，服务即将重启。`);
+                activeAvatarName = selectedAvatarName;
+                setDefaultAvatarReference(activeAvatarName);
+                ensureDefaultAvatarDimensions().catch(() => {});
+                updateAllOverlayPreviews();
+                avatarSelectBtn.innerHTML = '等待重启...';
+                avatarCustomToggleBtn.disabled = true;
+                setTimeout(() => {
+                    window.location.reload();
+                }, 6000);
+            } catch (error) {
+                console.error('avatar select failed', error);
+                const message = error.message || '切换失败，请稍后再试。';
+                if (/Failed to fetch/i.test(message)) {
+                    updateAvatarStatus('bg-warning text-dark', '重启中', '请求已发送，服务可能正在重启，请稍后手动刷新页面。');
+                    avatarSelectBtn.innerHTML = '等待重启...';
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 6000);
+                    return;
+                }
+                updateAvatarStatus('bg-danger', '失败', message);
+                avatarSelectBtn.disabled = false;
+                avatarSelectBtn.innerHTML = avatarSelectDefault;
+                avatarCustomToggleBtn.disabled = false;
+            }
+        });
+
+        expandBtn.addEventListener('click', () => {
+            if (expandBtn.disabled || slideElements.size <= 1) {
+                return;
+            }
+            slidesExpanded = !slidesExpanded;
+            expandBtn.textContent = slidesExpanded ? '收起' : '展开';
+            updateSlideVisibility();
+            refreshExpandControl();
+            refreshOverlayLayout();
+        });
+
+        applyAllBtn.addEventListener('click', () => {
+            if (applyAllBtn.disabled || !slideElements.size) {
+                return;
+            }
+            const firstSlide = slideElements.get(1);
+            const base = slidePositions[1]
+                ? { ...slidePositions[1] }
+                : computeDefaultPosition(firstSlide ? getSlideImageSize(firstSlide.image) : null);
+            slideElements.forEach((elements, slideIndex) => {
+                if (slideIndex === 1) {
+                    return;
+                }
+                setSlidePosition(slideIndex, { ...base }, elements.overlay, elements.info, {
+                    auto: autoPositionedSlides.has(slideIndex),
+                    canvas: elements.canvas,
+                    image: elements.image,
+                });
+            });
+            applyAllBtn.textContent = '已应用';
+            applyAllBtn.disabled = true;
+            setTimeout(() => {
+                applyAllBtn.textContent = '应用到全部';
+                applyAllBtn.disabled = slideElements.size <= 1;
+            }, 1500);
+        });
+
+        pptInput.addEventListener('change', () => {
+            updateFileLabel(pptInput, pptFilename);
+            loadPreview();
+            if (courseBtn) {
+                if (courseDownloadUrl) {
+                    URL.revokeObjectURL(courseDownloadUrl);
+                    courseDownloadUrl = null;
+                }
+                courseBtn.style.display = 'none';
+                courseBtn.disabled = false;
+                courseBtn.innerHTML = '<i class="bi bi-film me-2"></i>生成视频课';
+            }
+            currentSessionId = null;
+        });
+
+        clearPreview();
+
+        const bootstrap = async () => {
+            await loadCurrentAvatar();
+            await loadAvailableAvatars();
+        };
+
+        bootstrap().catch(error => {
+            console.error('bootstrap failed', error);
+        });
+
+        if (courseBtn) {
+            courseBtn.addEventListener('click', async () => {
+                if (!currentSessionId) {
+                    alert('请先生成数字人讲解 PPT。');
+                    return;
+                }
+
+                if (courseDownloadUrl) {
+                    URL.revokeObjectURL(courseDownloadUrl);
+                    courseDownloadUrl = null;
+                }
+
+                courseBtn.disabled = true;
+                courseBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>生成中...';
+                statusBadge.className = 'badge bg-warning text-dark status-badge';
+                statusBadge.textContent = '生成视频课';
+                statusText.textContent = '正在生成视频课，请稍候不要刷新页面。';
+                progressBar.style.width = '85%';
+
+                try {
+                    const response = await fetch('/ppt/course', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ sessionId: currentSessionId }),
+                    });
+                    if (!response.ok) {
+                        const text = await response.text();
+                        let message = text || '视频课生成失败';
+                        try {
+                            const payload = JSON.parse(text);
+                            if (payload && payload.msg) {
+                                message = payload.msg;
+                            }
+                        } catch (err) {
+                            // ignore
+                        }
+                        throw new Error(message);
+                    }
+
+                    const blob = await response.blob();
+                    const disposition = response.headers.get('Content-Disposition');
+                    const filename = extractFilename(disposition, 'livetalking-course.mp4');
+                    courseDownloadUrl = URL.createObjectURL(blob);
+
+                    const anchor = document.createElement('a');
+                    anchor.href = courseDownloadUrl;
+                    anchor.download = filename;
+                    document.body.appendChild(anchor);
+                    anchor.click();
+                    document.body.removeChild(anchor);
+
+                    statusBadge.className = 'badge bg-success status-badge';
+                    statusBadge.textContent = '视频课已生成';
+                    statusText.textContent = '视频课已下载完成，可再次点击重新生成。';
+                    progressBar.style.width = '100%';
+                    courseBtn.disabled = false;
+                    courseBtn.innerHTML = '<i class="bi bi-arrow-repeat me-2"></i>重新生成视频课';
+                } catch (error) {
+                    console.error('course generation failed', error);
+                    statusBadge.className = 'badge bg-danger status-badge';
+                    statusBadge.textContent = '视频课生成失败';
+                    statusText.textContent = error.message || '请稍后重试。';
+                    progressBar.style.width = '100%';
+                    alert('生成视频课失败：' + statusText.textContent);
+                    courseBtn.disabled = false;
+                    courseBtn.innerHTML = '<i class="bi bi-film me-2"></i>生成视频课';
+                }
+            });
+        }
+
+        resetBtn.addEventListener('click', () => {
+            pptInput.value = '';
+            docInput.value = '';
+            pptFilename.textContent = '尚未选择文件';
+            docFilename.textContent = '尚未选择文件';
+            statusBadge.className = 'badge bg-secondary status-badge';
+            statusBadge.textContent = '等待上传';
+            statusText.textContent = '请上传 PPT 与 Word 脚本开始';
+            progressBar.style.width = '0%';
+            resultCard.style.display = 'none';
+            downloadLink.removeAttribute('href');
+            downloadLink.removeAttribute('download');
+            if (courseBtn) {
+                if (courseDownloadUrl) {
+                    URL.revokeObjectURL(courseDownloadUrl);
+                    courseDownloadUrl = null;
+                }
+                courseBtn.style.display = 'none';
+                courseBtn.disabled = false;
+                courseBtn.innerHTML = '<i class="bi bi-film me-2"></i>生成视频课';
+            }
+            currentSessionId = null;
+            selectedVoiceId = DEFAULT_EDGE_VOICE;
+            updateVoiceButton();
+            closeVoiceMenu();
+            clearPreview();
+        });
+
+        document.getElementById('augment-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            if (!pptInput.files.length || !docInput.files.length) {
+                alert('请同时选择 PPT 与脚本 Word 文档。');
+                return;
+            }
+
+            const pptFile = pptInput.files[0];
+            const docFile = docInput.files[0];
+            if (pptFile.size > FILE_LIMIT_MB * 1024 * 1024 || docFile.size > FILE_LIMIT_MB * 1024 * 1024) {
+                alert(`单个文件大小请勿超过 ${FILE_LIMIT_MB} MB。`);
+                return;
+            }
+
+            if (courseBtn) {
+                if (courseDownloadUrl) {
+                    URL.revokeObjectURL(courseDownloadUrl);
+                    courseDownloadUrl = null;
+                }
+                courseBtn.style.display = 'none';
+                courseBtn.disabled = false;
+                courseBtn.innerHTML = '<i class="bi bi-film me-2"></i>生成视频课';
+            }
+            currentSessionId = null;
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>生成中...';
+
+            statusBadge.className = 'badge bg-info status-badge';
+            statusBadge.textContent = '上传中';
+            statusText.textContent = '正在上传文件至服务器...';
+            progressBar.style.width = '25%';
+
+            closeVoiceMenu();
+
+            const formData = new FormData();
+            formData.append('ppt', pptFile);
+            formData.append('script', docFile);
+            formData.append('positions', JSON.stringify(slidePositions || {}));
+            formData.append('voice', selectedVoiceId || DEFAULT_EDGE_VOICE);
+
+            try {
+                const response = await fetch('/ppt/augment', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    const text = await response.text();
+                    throw new Error(text || '服务端返回错误');
+                }
+
+                statusBadge.className = 'badge bg-warning text-dark status-badge';
+                statusBadge.textContent = '处理中';
+                statusText.textContent = '系统正在生成数字人视频并嵌入 PPT，请稍候...';
+                progressBar.style.width = '70%';
+
+                const blob = await response.blob();
+                const disposition = response.headers.get('Content-Disposition');
+                const filename = extractFilename(disposition, 'livetalking-augmented.pptx');
+                currentSessionId = response.headers.get('X-LiveTalking-Session') || null;
+
+                const fileUrl = URL.createObjectURL(blob);
+                downloadLink.href = fileUrl;
+                downloadLink.download = filename;
+
+                statusBadge.className = 'badge bg-success status-badge';
+                statusBadge.textContent = '完成';
+                statusText.textContent = '数字人讲解已生成，点击下方按钮下载增强版 PPT。';
+                progressBar.style.width = '100%';
+                resultCard.style.display = 'block';
+                if (courseBtn) {
+                    if (courseDownloadUrl) {
+                        URL.revokeObjectURL(courseDownloadUrl);
+                        courseDownloadUrl = null;
+                    }
+                    if (currentSessionId) {
+                        courseBtn.style.display = 'inline-flex';
+                        courseBtn.disabled = false;
+                        courseBtn.innerHTML = '<i class="bi bi-film me-2"></i>生成视频课';
+                    } else {
+                        courseBtn.style.display = 'none';
+                    }
+                }
+            } catch (error) {
+                console.error(error);
+                statusBadge.className = 'badge bg-danger status-badge';
+                statusBadge.textContent = '失败';
+                statusText.textContent = error.message || '生成失败，请稍后重试。';
+                progressBar.style.width = '100%';
+                alert('生成失败：' + statusText.textContent);
+                currentSessionId = null;
+                if (courseBtn) {
+                    if (courseDownloadUrl) {
+                        URL.revokeObjectURL(courseDownloadUrl);
+                        courseDownloadUrl = null;
+                    }
+                    courseBtn.style.display = 'none';
+                    courseBtn.disabled = false;
+                    courseBtn.innerHTML = '<i class="bi bi-film me-2"></i>生成视频课';
+                }
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-magic me-2"></i>开始生成数字人讲解 PPT';
+            }
+        });
+
+        window.addEventListener('beforeunload', () => {
+            if (courseDownloadUrl) {
+                URL.revokeObjectURL(courseDownloadUrl);
+                courseDownloadUrl = null;
+            }
+        });
+    </script>
+</body>
+</html>
