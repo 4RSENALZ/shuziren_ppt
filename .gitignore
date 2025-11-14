@@ -4,6 +4,7 @@ build/
 *.so
 *.mp4
 *.exe
+*.png
 
 tmp*
 trial*/
