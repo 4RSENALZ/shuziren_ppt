@@ -41,14 +41,14 @@ class DigitalHumanRenderer:
         session_factory: Callable[[], int],
         builder: Callable[[int], BaseReal],
         warmup_delay: float = 2.0,
-        speak_timeout: float = 180.0,
+        speak_timeout: Optional[float] = None,
         max_preroll: float = 1.5,
     ) -> None:
         from basereal import BaseReal  # Local import to avoid cycles
 
         self._session_factory = session_factory
         self._builder = builder
-        self._speak_timeout = speak_timeout
+        self._speak_timeout = speak_timeout if speak_timeout and speak_timeout > 0 else None
         self._max_preroll = max(0.0, float(max_preroll))
         self._start_event = Event()
         self._end_event = Event()
@@ -101,25 +101,25 @@ class DigitalHumanRenderer:
         self._nerfreal.start_recording(output_path)
         self._nerfreal.put_msg_txt(text, {"source": "ppt"})
 
-        if not self._start_event.wait(timeout=self._speak_timeout):
+        if self._speak_timeout is not None and not self._start_event.wait(timeout=self._speak_timeout):
             self._nerfreal.stop_recording()
             raise TimeoutError("数字人朗读未按预期启动，请稍后重试。")
 
         event_start_time = time.time()
 
-        speak_deadline = time.time() + self._speak_timeout
+        speak_deadline = None if self._speak_timeout is None else time.time() + self._speak_timeout
         poll_interval = 0.05  # shorter poll for quicker start/stop detection
         speech_start_time: Optional[float] = None
-        while time.time() < speak_deadline:
+        while True:
+            if speak_deadline is not None and time.time() >= speak_deadline:
+                self._nerfreal.stop_recording()
+                raise TimeoutError("数字人朗读未在限定时间内完成。")
             speaking_now = self._nerfreal.is_speaking()
             if speaking_now and speech_start_time is None:
                 speech_start_time = time.time()
             if self._end_event.is_set() and not speaking_now:
                 break
             time.sleep(poll_interval)
-        else:
-            self._nerfreal.stop_recording()
-            raise TimeoutError("数字人朗读未在限定时间内完成。")
 
         # 等待音视频管线彻底排空
         drain_deadline = time.time() + 3.0
@@ -518,6 +518,11 @@ class PPTDigitalHumanAugmenter:
         slide_dims_in: Tuple[float, float],
         total_slides: int,
         voice_id: Optional[str] = None,
+        slide_durations: Optional[Dict[int, float]] = None,
+        slide_cues: Optional[Dict[int, float]] = None,
+        combined_video_path: Optional[str] = None,
+        final_video_path: Optional[str] = None,
+        final_video_meta: Optional[Dict[str, Any]] = None,
     ) -> str:
         session_id = uuid.uuid4().hex
         session_dir = os.path.join(self._session_store_root, session_id)
@@ -540,6 +545,17 @@ class PPTDigitalHumanAugmenter:
             shutil.copy2(src_path, dest_path)
             video_index[str(slide_idx)] = dest_name
 
+        combined_filename = None
+        if combined_video_path and os.path.isfile(combined_video_path):
+            combined_filename = "combined.mp4"
+            combined_target = os.path.join(session_dir, combined_filename)
+            shutil.copy2(combined_video_path, combined_target)
+
+        final_filename = None
+        if final_video_path and os.path.isfile(final_video_path):
+            final_filename = "course_final.mp4"
+            shutil.copy2(final_video_path, os.path.join(session_dir, final_filename))
+
         meta: Dict[str, Any] = {
             "total_slides": total_slides,
             "applied_positions": applied_positions,
@@ -549,6 +565,10 @@ class PPTDigitalHumanAugmenter:
             "created_at": time.time(),
             "static_duration": self._course_static_duration,
             "voice": voice_id,
+            "slide_durations": {str(k): float(v) for k, v in (slide_durations or {}).items()},
+            "slide_cues": {str(k): float(v) for k, v in (slide_cues or {}).items()},
+            "combined_video": combined_filename,
+            "final_video": final_filename,
             "course": {
                 "ready": False,
                 "filename": "course.mp4",
@@ -557,6 +577,22 @@ class PPTDigitalHumanAugmenter:
                 "resolution": None,
             },
         }
+
+        if final_filename and final_video_meta:
+            course_info = meta.get("course", {})
+            course_info.update(
+                {
+                    "ready": True,
+                    "filename": final_filename,
+                    "duration": float(final_video_meta.get("duration", 0.0)),
+                    "segments": 1,
+                    "resolution": list(final_video_meta.get("resolution", (0, 0))),
+                    "generated_at": time.time(),
+                    "position": final_video_meta.get("position"),
+                    "source": "overlay",
+                }
+            )
+            meta["course"] = course_info
 
         self._save_session_meta(session_dir, meta)
         self._register_session(session_id, session_dir)
@@ -836,6 +872,381 @@ class PPTDigitalHumanAugmenter:
         subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return segment_path, max(duration, 0.0)
 
+    def _measure_video_geometry(self, video_path: str) -> Tuple[int, int]:
+        """Return the width and height of a video; (0, 0) when unavailable."""
+        cap = cv2.VideoCapture(video_path)
+        width = 0
+        height = 0
+        if cap.isOpened():
+            try:
+                width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+                height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+            finally:
+                cap.release()
+        else:
+            cap.release()
+        return max(width, 0), max(height, 0)
+
+    def _measure_video_duration(self, video_path: str) -> float:
+        cap = cv2.VideoCapture(video_path)
+        duration = 0.0
+        if cap.isOpened():
+            try:
+                fps = cap.get(cv2.CAP_PROP_FPS) or 0.0
+                frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0.0
+                if fps > 0.0 and frame_count > 0.0:
+                    duration = float(frame_count / fps)
+            finally:
+                cap.release()
+        else:
+            cap.release()
+        return max(duration, 0.0)
+
+    def _estimate_slide_timings(self, scripts: Dict[int, str]) -> Dict[int, float]:
+        estimations: Dict[int, float] = {}
+        for slide_idx, text in scripts.items():
+            content = text.strip()
+            if not content:
+                estimations[slide_idx] = 3.0
+                continue
+            plain = re.sub(r"\s+", "", content)
+            char_count = len(plain)
+            punctuation_hits = len(re.findall(r"[。！？!?,，；;…]", content))
+            base_seconds = char_count / 4.5  # rough speaking rate (~270 cpm)
+            punctuation_bonus = punctuation_hits * 0.35
+            estimations[slide_idx] = max(3.0, base_seconds + punctuation_bonus)
+        return estimations
+
+    def _normalize_slide_durations(
+        self,
+        slide_order: List[int],
+        raw_timings: Dict[int, float],
+        total_duration: float,
+    ) -> Dict[int, float]:
+        if not slide_order:
+            return {}
+        raw_values = [max(0.5, raw_timings.get(idx, 3.0)) for idx in slide_order]
+        total_raw = sum(raw_values)
+        if total_duration <= 0.0:
+            fallback = 5.0
+            return {idx: fallback for idx in slide_order}
+        if total_raw <= 0.0:
+            equal_share = max(0.5, total_duration / len(slide_order))
+            return {idx: equal_share for idx in slide_order}
+
+        scale = total_duration / total_raw
+        normalized: Dict[int, float] = {}
+        elapsed = 0.0
+        for idx, base in zip(slide_order, raw_values):
+            scaled = max(0.8, base * scale)
+            remaining = max(0.5, total_duration - elapsed)
+            duration = min(scaled, remaining)
+            normalized[idx] = duration
+            elapsed += duration
+
+        remainder = max(0.0, total_duration - elapsed)
+        if remainder > 0.01:
+            last_idx = slide_order[-1]
+            normalized[last_idx] = normalized.get(last_idx, 0.0) + remainder
+        return normalized
+
+    def _build_slide_cues(self, slide_order: List[int], durations: Dict[int, float]) -> Dict[int, float]:
+        cues: Dict[int, float] = {}
+        elapsed = 0.0
+        for idx in slide_order:
+            cues[idx] = max(0.0, elapsed)
+            elapsed += max(0.0, durations.get(idx, 0.0))
+        return cues
+
+    def _resolve_overlay_position(
+        self,
+        slide_dims_in: Tuple[float, float],
+        positions: Optional[Dict[int, Dict[str, float]]],
+        slide_order: List[int],
+    ) -> Dict[str, float]:
+        slide_width_in, slide_height_in = slide_dims_in
+        # try user-provided position first
+        if positions:
+            for idx in slide_order:
+                pos = positions.get(idx)
+                if isinstance(pos, dict):
+                    resolved = {
+                        "x": float(pos.get("x", 0.0)),
+                        "y": float(pos.get("y", 0.0)),
+                        "width": float(pos.get("width", 0.0)),
+                        "height": float(pos.get("height", 0.0)),
+                    }
+                    if resolved["width"] > 0 and resolved["height"] > 0:
+                        return {
+                            "x": max(0.0, min(1.0, resolved["x"])),
+                            "y": max(0.0, min(1.0, resolved["y"])),
+                            "width": max(0.02, min(1.0, resolved["width"])),
+                            "height": max(0.02, min(1.0, resolved["height"])),
+                        }
+
+        # fall back to default inches configuration
+        left_in, top_in, width_in, height_in = self._video_position
+        width_ratio = width_in / slide_width_in if slide_width_in else 0.3
+        height_ratio = height_in / slide_height_in if slide_height_in else 0.3
+        return {
+            "x": left_in / slide_width_in if slide_width_in else 0.55,
+            "y": top_in / slide_height_in if slide_height_in else 0.1,
+            "width": max(0.02, min(1.0, width_ratio)),
+            "height": max(0.02, min(1.0, height_ratio)),
+        }
+
+    def _split_combined_video(
+        self,
+        combined_path: str,
+        slide_order: List[int],
+        durations: Dict[int, float],
+        workdir: str,
+    ) -> Dict[int, str]:
+        if not self._ffmpeg_bin:
+            raise RuntimeError("未检测到 ffmpeg，无法拆分数字人视频。")
+        if not os.path.isfile(combined_path):
+            raise FileNotFoundError(f"未找到数字人合并视频: {combined_path}")
+
+        segments: Dict[int, str] = {}
+        start_time = 0.0
+        for slide_idx in slide_order:
+            duration = durations.get(slide_idx, 0.0)
+            if duration <= 0.1:
+                continue
+            output_path = os.path.join(workdir, f"slide_{slide_idx:03d}.mp4")
+            command = [
+                self._ffmpeg_bin,
+                "-y",
+                "-i",
+                combined_path,
+                "-ss",
+                f"{start_time:.3f}",
+                "-t",
+                f"{duration:.3f}",
+                "-map",
+                "0:v:0",
+                "-map",
+                "0:a?",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "veryfast",
+                "-crf",
+                "18",
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "192k",
+                "-ar",
+                "48000",
+                "-movflags",
+                "+faststart",
+                output_path,
+            ]
+            try:
+                subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            except subprocess.CalledProcessError as exc:
+                logger.warning("[ppt-augment] split combined video failed for slide %s: %s", slide_idx, exc)
+                break
+            if os.path.isfile(output_path):
+                segments[slide_idx] = output_path
+            start_time += duration
+        return segments
+
+    def _apply_slide_transitions(self, presentation: Presentation, timings: Dict[int, float]) -> None:
+        for slide_idx, duration in timings.items():
+            if slide_idx < 1 or slide_idx > len(presentation.slides):
+                continue
+            slide = presentation.slides[slide_idx - 1]
+            transition = getattr(slide, "slide_show_transition", None)
+            if transition is None:
+                logger.warning(
+                    "[ppt-augment] 当前 python-pptx 版本不支持 slide_show_transition，跳过自动切换设置 (slide=%s)",
+                    slide_idx,
+                )
+                continue
+            transition.advance_on_click = False
+            transition.advance_on_time = True
+            transition.advance_after_time = max(0.5, float(duration))
+
+    def _export_presentation_video(
+        self,
+        ppt_path: str,
+        slide_durations: Dict[int, float],
+        output_path: str,
+        fps: int = 25,
+        quality: int = 100,
+    ) -> Optional[str]:
+        if comtypes is None:
+            logger.warning("[ppt-augment] PowerPoint COM 不可用，无法导出课程视频。")
+            return None
+        if not os.path.isfile(ppt_path):
+            logger.warning("[ppt-augment] PowerPoint 文件缺失，无法导出课程视频: %s", ppt_path)
+            return None
+
+        powerpoint = None
+        presentation = None
+        initialized = False
+        try:
+            comtypes.CoInitialize()
+            initialized = True
+            powerpoint = comtypes.client.CreateObject("PowerPoint.Application")
+            powerpoint.Visible = 1
+            try:
+                powerpoint.WindowState = 2  # ppWindowMinimized
+            except Exception:
+                pass
+            presentation = powerpoint.Presentations.Open(ppt_path, WithWindow=True)
+
+            slide_count = presentation.Slides.Count
+            for slide_idx, duration in slide_durations.items():
+                if slide_idx < 1 or slide_idx > slide_count:
+                    continue
+                try:
+                    slide = presentation.Slides(slide_idx)
+                    transition = slide.SlideShowTransition
+                    transition.AdvanceOnClick = False
+                    transition.AdvanceOnTime = True
+                    transition.AdvanceTime = max(0.5, float(duration))
+                except Exception as exc:  # pragma: no cover - COM quirks
+                    logger.warning(
+                        "[ppt-augment] 设置幻灯片 %s 切换时间失败: %s",
+                        slide_idx,
+                        exc,
+                    )
+
+            try:
+                presentation.Save()
+            except Exception:
+                pass
+
+            try:
+                presentation.CreateVideo(
+                    output_path,
+                    UseTimingsAndNarrations=True,
+                    DefaultSlideDuration=5,
+                    VertResolution=1080,
+                    FramesPerSecond=fps,
+                    Quality=quality,
+                )
+            except Exception as exc:
+                logger.warning("[ppt-augment] PowerPoint 导出启动失败: %s", exc)
+                return None
+
+            status = getattr(presentation, "CreateVideoStatus", None)
+            if status is None:
+                logger.warning("[ppt-augment] 当前 PowerPoint 不支持 CreateVideoStatus")
+                return None
+            deadline = time.time() + 900.0
+            while status in (0, 1, 2) and time.time() < deadline:
+                time.sleep(0.5)
+                status = presentation.CreateVideoStatus
+            if status == 3 and os.path.isfile(output_path):
+                return output_path
+            if status == 4:
+                logger.warning("[ppt-augment] PowerPoint 导出失败，状态=4")
+                return None
+            logger.warning("[ppt-augment] PowerPoint 导出超时或状态异常: %s", status)
+            return None
+        except Exception as exc:
+            logger.warning("[ppt-augment] 导出课程视频失败: %s", exc)
+            return None
+        finally:
+            if presentation is not None:
+                try:
+                    presentation.Close()
+                except Exception:
+                    pass
+            if powerpoint is not None:
+                try:
+                    powerpoint.Quit()
+                except Exception:
+                    pass
+            if initialized:
+                try:
+                    comtypes.CoUninitialize()
+                except Exception:
+                    pass
+
+    def _overlay_avatar_on_ppt_video(
+        self,
+        base_video_path: str,
+        avatar_video_path: str,
+        position: Dict[str, float],
+        output_path: str,
+    ) -> Optional[str]:
+        if not self._ffmpeg_bin:
+            raise RuntimeError("未检测到 ffmpeg，无法叠加数字人视频。")
+        if not os.path.isfile(base_video_path) or not os.path.isfile(avatar_video_path):
+            logger.warning("[ppt-augment] 叠加视频缺失: %s / %s", base_video_path, avatar_video_path)
+            return None
+
+        base_width, base_height = self._measure_video_geometry(base_video_path)
+        if base_width <= 0 or base_height <= 0:
+            logger.warning("[ppt-augment] 无法读取课件视频尺寸，叠加终止。")
+            return None
+
+        overlay_w = int(round(max(0.02, min(1.0, position.get("width", 0.3))) * base_width))
+        overlay_h = int(round(max(0.02, min(1.0, position.get("height", 0.3))) * base_height))
+        overlay_x = int(round(max(0.0, min(1.0, position.get("x", 0.6))) * base_width))
+        overlay_y = int(round(max(0.0, min(1.0, position.get("y", 0.1))) * base_height))
+
+        overlay_w = max(2, min(base_width, overlay_w + (overlay_w % 2)))
+        overlay_h = max(2, min(base_height, overlay_h + (overlay_h % 2)))
+        max_x = max(0, base_width - overlay_w)
+        max_y = max(0, base_height - overlay_h)
+        overlay_x = max(0, min(max_x, overlay_x))
+        overlay_y = max(0, min(max_y, overlay_y))
+
+        filter_complex = (
+            f"[0:v]setsar=1[vbg];"
+            f"[1:v]scale={overlay_w}:{overlay_h}:force_original_aspect_ratio=increase,"
+            f"crop={overlay_w}:{overlay_h},setsar=1[vavatar];"
+            f"[vbg][vavatar]overlay={overlay_x}:{overlay_y}:format=yuv420[outv]"
+        )
+
+        command = [
+            self._ffmpeg_bin,
+            "-y",
+            "-i",
+            base_video_path,
+            "-i",
+            avatar_video_path,
+            "-filter_complex",
+            filter_complex,
+            "-map",
+            "[outv]",
+            "-map",
+            "1:a?",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-crf",
+            "18",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "192k",
+            "-ar",
+            "48000",
+            "-movflags",
+            "+faststart",
+            "-shortest",
+            output_path,
+        ]
+        try:
+            subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except subprocess.CalledProcessError as exc:
+            logger.warning("[ppt-augment] 数字人叠加失败: %s", exc)
+            return None
+
+        return output_path if os.path.isfile(output_path) else None
+
     def _build_course_static_segment(
         self,
         background_path: str,
@@ -1034,30 +1445,66 @@ class PPTDigitalHumanAugmenter:
                     return self._builder(session_id, voice_id)
                 return self._builder(session_id)
 
+            slide_order = [idx for idx, _ in sorted(scripts.items()) if 1 <= idx <= total_slides]
+            if not slide_order:
+                raise RuntimeError("脚本未匹配到任何有效的幻灯片索引。")
+
+            combined_text = "\n\n".join(scripts[idx].strip() for idx in slide_order if scripts[idx].strip())
+            if not combined_text:
+                raise RuntimeError("脚本内容为空，无法生成数字人朗读。")
+
             renderer = DigitalHumanRenderer(self._session_factory, build_renderer)
-            generated_videos: Dict[int, str] = {}
-            applied_positions: Dict[int, Dict[str, float]] = {}
+            combined_video_path = os.path.join(workdir, "combined_avatar.mp4")
             try:
-                for slide_idx, text in scripts.items():
-                    if slide_idx < 1 or slide_idx > total_slides:
-                        continue
-                    output_video = os.path.join(workdir, f"slide_{slide_idx:03d}.mp4")
-                    renderer.speak(text, output_video)
-                    generated_videos[slide_idx] = output_video
+                renderer.speak(combined_text, combined_video_path)
             finally:
                 renderer.close()
 
-            if not generated_videos:
-                raise RuntimeError("未能成功生成任何数字人讲解视频，请检查脚本内容。")
+            if not os.path.isfile(combined_video_path):
+                raise RuntimeError("数字人朗读输出缺失，生成失败。")
 
-            for slide_idx, video_path in generated_videos.items():
-                slide = presentation.slides[slide_idx - 1]
-                position = None
-                if positions:
-                    position = positions.get(slide_idx)
-                applied = self._embed_video(slide, video_path, position, slide_dims_in)
-                if applied:
-                    applied_positions[slide_idx] = applied
+            combined_duration = self._measure_video_duration(combined_video_path)
+            if combined_duration <= 0.0:
+                raise RuntimeError("无法解析数字人视频时长，请检查生成的文件。")
+
+            ordered_scripts = {idx: scripts[idx] for idx in slide_order}
+            raw_timings = self._estimate_slide_timings(ordered_scripts)
+            slide_durations = self._normalize_slide_durations(slide_order, raw_timings, combined_duration)
+            slide_cues = self._build_slide_cues(slide_order, slide_durations)
+
+            generated_videos = self._split_combined_video(
+                combined_video_path,
+                slide_order,
+                slide_durations,
+                workdir,
+            )
+            if len(generated_videos) < len(slide_order):
+                missing = sorted(set(slide_order) - set(generated_videos.keys()))
+                raise RuntimeError(f"未能拆分全部数字人视频，请检查幻灯片 {missing[:3]} 等的音频时长。")
+
+            overlay_position = self._resolve_overlay_position(slide_dims_in, positions, slide_order)
+
+            timed_ppt_path = os.path.join(workdir, "timed.pptx")
+            presentation.save(timed_ppt_path)
+
+            ppt_video_path = os.path.join(workdir, "ppt_base.mp4")
+            exported_video = self._export_presentation_video(timed_ppt_path, slide_durations, ppt_video_path)
+            if not exported_video:
+                raise RuntimeError("PowerPoint 无法导出课程视频，请确认 PowerPoint 已安装且允许可见窗口运行。")
+
+            final_overlay_path = os.path.join(workdir, "course_overlay.mp4")
+            overlay_video = self._overlay_avatar_on_ppt_video(exported_video, combined_video_path, overlay_position, final_overlay_path)
+            if not overlay_video:
+                raise RuntimeError("叠加数字人视频失败，无法生成课程视频。")
+
+            final_video_duration = self._measure_video_duration(overlay_video) or combined_duration
+            final_video_resolution = self._measure_video_geometry(overlay_video)
+
+            presentation = Presentation(timed_ppt_path)
+            target_slide_index = slide_order[0]
+            embed_slide = presentation.slides[target_slide_index - 1]
+            applied_position = self._embed_video(embed_slide, combined_video_path, overlay_position, slide_dims_in)
+            applied_positions: Dict[int, Dict[str, float]] = {target_slide_index: applied_position}
 
             output_path = os.path.join(workdir, "augmented.pptx")
             presentation.save(output_path)
@@ -1069,10 +1516,18 @@ class PPTDigitalHumanAugmenter:
             if not safe_name.lower().endswith(".pptx"):
                 safe_name += ".pptx"
 
+            final_video_name = os.path.basename(overlay_video)
             meta = {
                 "filename": safe_name,
                 "total_slides": total_slides,
-                "video_slides": sorted(generated_videos.keys()),
+                "video_slides": [target_slide_index],
+                "slide_durations": slide_durations,
+                "slide_cues": slide_cues,
+                "combined_duration": combined_duration,
+                "final_video": final_video_name,
+                "final_video_duration": final_video_duration,
+                "final_video_resolution": final_video_resolution,
+                "overlay_position": overlay_position,
             }
             session_id = self._persist_session_assets(
                 ppt_bytes,
@@ -1081,21 +1536,30 @@ class PPTDigitalHumanAugmenter:
                 slide_dims_in,
                 total_slides,
                 voice_id,
+                slide_durations,
+                slide_cues,
+                combined_video_path,
+                overlay_video,
+                {
+                    "duration": final_video_duration,
+                    "resolution": final_video_resolution,
+                    "position": overlay_position,
+                    "slide": target_slide_index,
+                },
             )
             meta["session_id"] = session_id
             course_bytes: Optional[bytes] = None
+            meta.update(
+                {
+                    "course_filename": final_video_name,
+                    "course_duration": final_video_duration,
+                    "course_segments": 1,
+                    "course_resolution": final_video_resolution,
+                }
+            )
             if produce_course:
-                base_stem = os.path.splitext(os.path.basename(safe_name))[0]
-                course_filename = f"{base_stem}-course.mp4"
-                course_bytes, course_meta = self.compose_course_from_session(session_id, course_filename)
-                meta.update(
-                    {
-                        "course_filename": course_meta.get("filename", course_filename),
-                        "course_duration": course_meta.get("duration"),
-                        "course_segments": course_meta.get("segments"),
-                        "course_resolution": course_meta.get("resolution"),
-                    }
-                )
+                with open(overlay_video, "rb") as course_file:
+                    course_bytes = course_file.read()
 
             meta["voice"] = voice_id
             return result_bytes, meta, course_bytes
