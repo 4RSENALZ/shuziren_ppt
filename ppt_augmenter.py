@@ -99,7 +99,11 @@ class DigitalHumanRenderer:
 
         record_start = time.time()
         self._nerfreal.start_recording(output_path)
-        self._nerfreal.put_msg_txt(text, {"source": "ppt"})
+        is_ssml = text.lstrip().lower().startswith("<speak")
+        meta = {"source": "ppt"}
+        if is_ssml:
+            meta["ssml"] = True
+        self._nerfreal.put_msg_txt(text, meta)
 
         if self._speak_timeout is not None and not self._start_event.wait(timeout=self._speak_timeout):
             self._nerfreal.stop_recording()
@@ -366,14 +370,28 @@ class PPTDigitalHumanAugmenter:
         self._active_sessions: Dict[str, Dict[str, Any]] = {}
         self._max_sessions = 8
 
-    def _parse_scripts(self, docx_path: str) -> Dict[int, str]:
+    def _parse_scripts(self, docx_path: str) -> Tuple[Dict[int, str], Dict[str, str]]:
         document = Document(docx_path)
         pattern = re.compile(r"^p(\d+)[\s:：\.-]*", re.IGNORECASE)
         scripts: Dict[int, List[str]] = {}
         current_slide = None
+        ssml_prefix: Optional[str] = None
+        ssml_suffix: Optional[str] = None
         for paragraph in document.paragraphs:
             text = paragraph.text.strip()
             if not text:
+                continue
+            lowered = text.lower()
+            if (
+                ssml_prefix is None
+                and not scripts
+                and current_slide is None
+                and lowered.startswith("<speak")
+            ):
+                ssml_prefix = text
+                continue
+            if lowered == "</speak>":
+                ssml_suffix = text
                 continue
             match = pattern.match(text)
             if match:
@@ -385,7 +403,13 @@ class PPTDigitalHumanAugmenter:
                     scripts[current_slide].append(content)
             elif current_slide is not None:
                 scripts[current_slide].append(text)
-        return {idx: "\n".join(lines).strip() for idx, lines in scripts.items() if lines}
+        flattened = {idx: "\n".join(lines).strip() for idx, lines in scripts.items() if lines}
+        meta: Dict[str, str] = {}
+        if ssml_prefix:
+            meta["ssml_prefix"] = ssml_prefix
+        if ssml_suffix:
+            meta["ssml_suffix"] = ssml_suffix
+        return flattened, meta
 
     def _locate_ffmpeg_binary(self) -> Optional[str]:
         root_dir = os.path.dirname(os.path.abspath(__file__))
@@ -903,18 +927,71 @@ class PPTDigitalHumanAugmenter:
         return max(duration, 0.0)
 
     def _estimate_slide_timings(self, scripts: Dict[int, str]) -> Dict[int, float]:
+        """Estimate slide display time using heuristic speech pacing."""
+        base_chars_per_second = 6.21 # ppt切换慢于语速则调高 （6.2ppt有点偏慢，6.3偏快）
+        punctuation_pauses = {
+            "。": 0.40,
+            "？": 0.30,
+            "?": 0.30,
+            "！": 0.30,
+            "!": 0.30,
+            "；": 0.30,
+            ";": 0.30,
+            "，": 0.25,
+            ",": 0.25,
+            "：": 0.25,
+            ":": 0.25,
+            "…": 0.35,
+        }
+        number_bonus = 0.20
+        english_bonus = 0.06
+        technical_bonus = 0.04
+        inhale_time = 0.30
+        extra_symbols = {
+            "-": 0.20,
+            "——": 0.20,
+            "~": 0.15,
+            "（": 0.15,
+            "）": 0.15,
+            "(": 0.15,
+            ")": 0.15,
+            "“": 0.10,
+            "”": 0.10,
+            "'": 0.10,
+            '"': 0.10,
+            "<": 0.20,
+            ">": 0.20,
+        }
+
         estimations: Dict[int, float] = {}
         for slide_idx, text in scripts.items():
             content = text.strip()
             if not content:
                 estimations[slide_idx] = 3.0
                 continue
+
             plain = re.sub(r"\s+", "", content)
             char_count = len(plain)
-            punctuation_hits = len(re.findall(r"[。！？!?,，；;…]", content))
-            base_seconds = char_count / 4.5  # rough speaking rate (~270 cpm)
-            punctuation_bonus = punctuation_hits * 0.35
-            estimations[slide_idx] = max(3.0, base_seconds + punctuation_bonus)
+            base_seconds = char_count / base_chars_per_second if char_count else 0.0
+
+            punctuation_bonus_total = sum(punctuation_pauses.get(ch, 0.0) for ch in content)
+            punctuation_bonus_total += sum(extra_symbols.get(ch, 0.0) for ch in content)
+
+            number_hits = re.findall(r"\d+(?:[\.，,]\d+)?", content)
+            number_bonus_total = len(number_hits) * number_bonus
+
+            english_tokens = re.findall(r"[A-Za-z]+", content)
+            english_bonus_total = 0.0
+            for token in english_tokens:
+                english_bonus_total += english_bonus
+                if token.isupper() or (len(token) > 1 and token[0].isupper()):
+                    english_bonus_total += technical_bonus
+
+            sentence_units = [segment for segment in re.split(r"[。！？!?\n]+", content) if segment.strip()]
+            inhale_bonus = inhale_time * max(len(sentence_units), 1)
+
+            total = base_seconds + punctuation_bonus_total + number_bonus_total + english_bonus_total + inhale_bonus
+            estimations[slide_idx] = max(3.0, total)
         return estimations
 
     def _normalize_slide_durations(
@@ -934,20 +1011,21 @@ class PPTDigitalHumanAugmenter:
             equal_share = max(0.5, total_duration / len(slide_order))
             return {idx: equal_share for idx in slide_order}
 
-        scale = total_duration / total_raw
-        normalized: Dict[int, float] = {}
-        elapsed = 0.0
-        for idx, base in zip(slide_order, raw_values):
-            scaled = max(0.8, base * scale)
-            remaining = max(0.5, total_duration - elapsed)
-            duration = min(scaled, remaining)
-            normalized[idx] = duration
-            elapsed += duration
-
-        remainder = max(0.0, total_duration - elapsed)
-        if remainder > 0.01:
+        normalized: Dict[int, float] = {idx: base for idx, base in zip(slide_order, raw_values)}
+        current_total = sum(normalized.values())
+        diff = total_duration - current_total
+        if abs(diff) > 0.01:
             last_idx = slide_order[-1]
-            normalized[last_idx] = normalized.get(last_idx, 0.0) + remainder
+            original_last = normalized[last_idx]
+            adjusted_last = max(0.5, original_last + diff)
+            normalized[last_idx] = adjusted_last
+            logger.info(
+                "[ppt-augment] adjusted last slide duration p%s: %.2fs -> %.2fs (Δ%.2fs)",
+                last_idx,
+                original_last,
+                adjusted_last,
+                adjusted_last - original_last,
+            )
         return normalized
 
     def _build_slide_cues(self, slide_order: List[int], durations: Dict[int, float]) -> Dict[int, float]:
@@ -1430,7 +1508,7 @@ class PPTDigitalHumanAugmenter:
             with open(doc_path, "wb") as f:
                 f.write(docx_bytes)
 
-            scripts = self._parse_scripts(doc_path)
+            scripts, scripts_meta = self._parse_scripts(doc_path)
             if not scripts:
                 raise ValueError("脚本文件中未找到形如 p1/p2 的段落标记。")
 
@@ -1449,7 +1527,33 @@ class PPTDigitalHumanAugmenter:
             if not slide_order:
                 raise RuntimeError("脚本未匹配到任何有效的幻灯片索引。")
 
-            combined_text = "\n\n".join(scripts[idx].strip() for idx in slide_order if scripts[idx].strip())
+            combined_body = "\n\n".join(scripts[idx].strip() for idx in slide_order if scripts[idx].strip())
+            ssml_prefix = scripts_meta.get("ssml_prefix") if scripts_meta else None
+            ssml_suffix = scripts_meta.get("ssml_suffix") if scripts_meta else None
+            combined_text = combined_body
+            if combined_body:
+                needs_wrapper = bool(ssml_prefix or ssml_suffix)
+                if not needs_wrapper:
+                    lower_body = combined_body.lower()
+                    ssml_markers = (
+                        "<break",
+                        "<say-as",
+                        "<phoneme",
+                        "<prosody",
+                        "<sub",
+                        "<emphasis",
+                        "<s>",
+                        "<p>",
+                        "<audio",
+                    )
+                    if any(marker in lower_body for marker in ssml_markers):
+                        needs_wrapper = True
+                if needs_wrapper:
+                    parts: List[str] = []
+                    parts.append(ssml_prefix or "<speak>")
+                    parts.append(combined_body)
+                    parts.append(ssml_suffix or "</speak>")
+                    combined_text = "\n".join(part for part in parts if part)
             if not combined_text:
                 raise RuntimeError("脚本内容为空，无法生成数字人朗读。")
 
@@ -1468,16 +1572,19 @@ class PPTDigitalHumanAugmenter:
                 raise RuntimeError("无法解析数字人视频时长，请检查生成的文件。")
 
             ordered_scripts = {idx: scripts[idx] for idx in slide_order}
+            logger.info("[ppt-augment] estimating slide timings for %d slides", len(ordered_scripts))
             raw_timings = self._estimate_slide_timings(ordered_scripts)
             slide_durations = self._normalize_slide_durations(slide_order, raw_timings, combined_duration)
             slide_cues = self._build_slide_cues(slide_order, slide_durations)
 
+            logger.info("[ppt-augment] splitting combined video into %d segments", len(slide_order))
             generated_videos = self._split_combined_video(
                 combined_video_path,
                 slide_order,
                 slide_durations,
                 workdir,
             )
+            logger.info("[ppt-augment] split finished, generated %d segments", len(generated_videos))
             if len(generated_videos) < len(slide_order):
                 missing = sorted(set(slide_order) - set(generated_videos.keys()))
                 raise RuntimeError(f"未能拆分全部数字人视频，请检查幻灯片 {missing[:3]} 等的音频时长。")
@@ -1488,14 +1595,18 @@ class PPTDigitalHumanAugmenter:
             presentation.save(timed_ppt_path)
 
             ppt_video_path = os.path.join(workdir, "ppt_base.mp4")
+            logger.info("[ppt-augment] exporting PowerPoint video to %s", ppt_video_path)
             exported_video = self._export_presentation_video(timed_ppt_path, slide_durations, ppt_video_path)
             if not exported_video:
                 raise RuntimeError("PowerPoint 无法导出课程视频，请确认 PowerPoint 已安装且允许可见窗口运行。")
+            logger.info("[ppt-augment] PowerPoint export finished: %s", exported_video)
 
             final_overlay_path = os.path.join(workdir, "course_overlay.mp4")
+            logger.info("[ppt-augment] overlaying avatar video onto PPT base")
             overlay_video = self._overlay_avatar_on_ppt_video(exported_video, combined_video_path, overlay_position, final_overlay_path)
             if not overlay_video:
                 raise RuntimeError("叠加数字人视频失败，无法生成课程视频。")
+            logger.info("[ppt-augment] overlay finished: %s", overlay_video)
 
             final_video_duration = self._measure_video_duration(overlay_video) or combined_duration
             final_video_resolution = self._measure_video_geometry(overlay_video)

@@ -92,11 +92,24 @@ class BaseTTS:
 
 ###########################################################################################
 class EdgeTTS(BaseTTS):
+    def __init__(self, opt, parent:BaseReal):
+        super().__init__(opt, parent)
+        voice_candidate = getattr(opt, "voice", None)
+        if not voice_candidate:
+            voice_candidate = getattr(opt, "REF_FILE", None)
+        if not voice_candidate:
+            voice_candidate = "zh-CN-XiaoxiaoNeural"
+        self.voice = voice_candidate
+
     def txt_to_audio(self,msg:tuple[str, dict]):
-        voicename = self.opt.REF_FILE #"zh-CN-YunxiaNeural"
-        text,textevent = msg
+        voicename = self.voice
+        text, textevent = msg
+        meta = dict(textevent or {})
+        is_ssml = bool(meta.pop("ssml", False))
+        if not is_ssml and text and text.lstrip().lower().startswith("<speak"):
+            is_ssml = True
         t = time.time()
-        asyncio.new_event_loop().run_until_complete(self.__main(voicename,text))
+        asyncio.new_event_loop().run_until_complete(self.__main(voicename, text, is_ssml))
         logger.info(f'-------edge tts time:{time.time()-t:.4f}s')
         if self.input_stream.getbuffer().nbytes<=0: #edgetts err
             logger.error('edgetts err!!!!!')
@@ -111,10 +124,10 @@ class EdgeTTS(BaseTTS):
             streamlen -= self.chunk
             if idx==0:
                 eventpoint={'status':'start','text':text}
-                eventpoint.update(**textevent) #eventpoint={'status':'start','text':text,'msgevent':textevent}
+                eventpoint.update(**meta) #eventpoint={'status':'start','text':text,'msgevent':textevent}
             elif streamlen<self.chunk:
                 eventpoint={'status':'end','text':text}
-                eventpoint.update(**textevent) #eventpoint={'status':'end','text':text,'msgevent':textevent}
+                eventpoint.update(**meta) #eventpoint={'status':'end','text':text,'msgevent':textevent}
             self.parent.put_audio_frame(stream[idx:idx+self.chunk],eventpoint)
             idx += self.chunk
         #if streamlen>0:  #skip last frame(not 20ms)
@@ -138,9 +151,12 @@ class EdgeTTS(BaseTTS):
 
         return stream
     
-    async def __main(self,voicename: str, text: str):
+    async def __main(self,voicename: str, text: str, is_ssml: bool = False):
         try:
-            communicate = edge_tts.Communicate(text, voicename)
+            if is_ssml:
+                communicate = edge_tts.Communicate(text=text, voice=voicename)
+            else:
+                communicate = edge_tts.Communicate(text, voicename)
             # 出现edgetts err问题时可设置代理?
             # communicate = edge_tts.Communicate(text,proxy="http://127.0.0.1:7890")
             #with open(OUTPUT_FILE, "wb") as file:
